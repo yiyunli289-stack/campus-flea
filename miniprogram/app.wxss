@@ -1,0 +1,65 @@
+/* ============================================
+   全局主题 —— 四川大学标准色（红檐青砖）
+   锦绣红 #B4100A / 优雅灰 #87A1A1 / 中国红 #E60000
+   ============================================ */
+page {
+  /* 品牌色 */
+  --brand: #B4100A;        /* 锦绣红 · 主色 */
+  --brand-dark: #8E0D08;   /* 主色按压态 */
+  --brand-light: #F8EEED;  /* 主色浅底 */
+  --accent: #E60000;       /* 中国红 · 价格/强调 */
+  --gray: #87A1A1;         /* 优雅灰 · 辅助 */
+  --gray-light: #EFF3F3;   /* 灰浅底 */
+
+  /* 中性色 */
+  --text: #333333;
+  --text-2: #999999;
+  --text-3: #C0C0C0;
+  --border: #EBEBEB;
+  --bg: #F5F6F7;
+  --white: #FFFFFF;
+
+  background: var(--bg);
+  color: var(--text);
+  font-size: 28rpx;
+  line-height: 1.5;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+/* 通用按钮 */
+.btn-brand {
+  background: var(--brand);
+  color: #fff;
+  border-radius: 12rpx;
+  font-size: 30rpx;
+  text-align: center;
+  padding: 20rpx 0;
+}
+.btn-brand:active { background: var(--brand-dark); }
+.btn-ghost {
+  background: var(--white);
+  color: var(--brand);
+  border: 1rpx solid var(--brand);
+  border-radius: 12rpx;
+  font-size: 30rpx;
+  text-align: center;
+  padding: 20rpx 0;
+}
+
+/* 价格 */
+.price {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 卡片 */
+.card {
+  background: var(--white);
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+/* 通用文本 */
+.text-2 { color: var(--text-2); }
+.text-3 { color: var(--text-3); }

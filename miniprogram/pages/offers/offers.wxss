@@ -1,0 +1,27 @@
+.page { padding: 24rpx; }
+
+.tabs { display: flex; background: var(--bg); border-radius: 16rpx; padding: 6rpx; margin-bottom: 24rpx; }
+.tab { flex: 1; text-align: center; font-size: 28rpx; color: var(--text-2); padding: 16rpx 0; border-radius: 12rpx; }
+.tab.on { background: var(--white); color: var(--brand); font-weight: 600; }
+
+.offer { margin-bottom: 20rpx; }
+.o-top { display: flex; align-items: baseline; justify-content: space-between; }
+.o-user { font-size: 30rpx; font-weight: 600; color: var(--text); }
+.o-college { font-size: 22rpx; color: var(--text-2); font-weight: 400; }
+.o-price { font-size: 34rpx; color: var(--accent); font-weight: 700; }
+.o-goods { font-size: 26rpx; color: var(--text); margin-top: 12rpx; }
+.o-msg { font-size: 24rpx; color: var(--text-2); margin-top: 8rpx; }
+.o-time { font-size: 22rpx; color: var(--text-3); margin-top: 12rpx; }
+.o-status { display: inline-block; font-size: 22rpx; padding: 4rpx 16rpx; border-radius: 8rpx; margin-top: 12rpx; }
+.st-pending { background: var(--brand-light); color: var(--brand); }
+.st-accepted { background: #e6f4ea; color: #2f9e44; }
+.st-rejected { background: var(--gray-light); color: var(--text-2); }
+.st-cancelled { background: var(--bg); color: var(--text-3); }
+.o-contact { font-size: 26rpx; color: var(--brand); margin-top: 12rpx; }
+.o-actions { display: flex; gap: 16rpx; margin-top: 20rpx; }
+.o-btn { font-size: 26rpx; color: var(--brand); border: 1rpx solid var(--brand); border-radius: 32rpx; padding: 10rpx 30rpx; }
+.o-btn.primary { background: var(--brand); color: #fff; }
+
+.empty { text-align: center; padding: 80rpx 0; }
+.empty-emoji { font-size: 96rpx; }
+.empty-text { font-size: 30rpx; color: var(--text-2); margin-top: 24rpx; }

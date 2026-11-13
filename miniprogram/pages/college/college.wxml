@@ -1,0 +1,13 @@
+<view class="page">
+  <view class="intro">按学科门类浏览川大各学院书单</view>
+
+  <view class="group" wx:for="{{groups}}" wx:key="group">
+    <view class="group-title">{{item.group}}</view>
+    <view class="group-list card">
+      <view class="college-item" wx:for="{{item.colleges}}" wx:for-item="college" wx:key="*this" bindtap="onCollege" data-name="{{college}}">
+        <text class="ci-name">{{college}}</text>
+        <text class="ci-arrow">›</text>
+      </view>
+    </view>
+  </view>
+</view>

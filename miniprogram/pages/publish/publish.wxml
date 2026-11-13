@@ -1,0 +1,115 @@
+<view class="page">
+  <!-- 批量录入入口 -->
+  <view class="batch-entry card" bindtap="goOcr">
+    <text class="be-icon">📚</text>
+    <view class="be-main">
+      <view class="be-title">批量录入图书</view>
+      <view class="be-sub">拍书脊自动识别，或连续扫 ISBN</view>
+    </view>
+    <text class="be-arrow">›</text>
+  </view>
+
+  <!-- 类目 -->
+  <view class="section card">
+    <view class="sec-title">类目</view>
+    <view class="cat-list">
+      <view class="cat-item {{cat === item.key ? 'on' : ''}}" wx:for="{{cats}}" wx:key="key" bindtap="onCat" data-key="{{item.key}}">
+        <text class="cat-icon">{{item.icon}}</text>
+        <text class="cat-name">{{item.name}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 图片 -->
+  <view class="section card">
+    <view class="sec-title">商品图片（{{images.length}}/9）</view>
+    <view class="img-list">
+      <view class="img-item" wx:for="{{images}}" wx:key="*this">
+        <image class="img" src="{{item}}" mode="aspectFill" />
+        <view class="img-del" catchtap="removeImage" data-i="{{index}}">×</view>
+      </view>
+      <view class="img-add" bindtap="chooseImages">＋</view>
+    </view>
+  </view>
+
+  <!-- 交易方式 -->
+  <view class="section card">
+    <view class="sec-title">交易方式</view>
+    <view class="seg">
+      <view class="seg-item {{tradeType === '定价' ? 'on' : ''}}" bindtap="onTrade" data-key="定价">卖家定价</view>
+      <view class="seg-item {{tradeType === '竞价' ? 'on' : ''}}" bindtap="onTrade" data-key="竞价">买家竞价</view>
+    </view>
+    <view class="switch-row" wx:if="{{tradeType === '定价'}}">
+      <text class="switch-label">接受议价</text>
+      <switch checked="{{allowBargain}}" bindchange="onBargain" color="#B4100A" />
+    </view>
+  </view>
+
+  <!-- 基本信息 -->
+  <view class="section card">
+    <view class="sec-title">基本信息</view>
+    <view class="field">
+      <text class="label">标题</text>
+      <input class="input" placeholder="一句话描述商品" value="{{title}}" data-field="title" bindinput="onInput" />
+    </view>
+    <view class="field">
+      <text class="label">价格（元）</text>
+      <input class="input" type="digit" placeholder="{{tradeType === '竞价' ? '起拍价' : '一口价'}}" value="{{price}}" data-field="price" bindinput="onInput" />
+    </view>
+    <view class="field">
+      <text class="label">成色</text>
+      <picker range="{{conditions}}" value="{{conditionIndex}}" bindchange="onCondition">
+        <view class="picker-val">{{condition}} ›</view>
+      </picker>
+    </view>
+    <view class="field">
+      <text class="label">校区</text>
+      <picker range="{{campusList}}" value="{{campusIndex}}" bindchange="onCampus">
+        <view class="picker-val">{{campus}} ›</view>
+      </picker>
+    </view>
+    <view class="field field-area">
+      <text class="label">描述</text>
+      <textarea class="textarea" placeholder="成色、使用情况、转手原因…" value="{{desc}}" data-field="desc" bindinput="onInput" />
+    </view>
+  </view>
+
+  <!-- 图书专属 -->
+  <view class="section card" wx:if="{{cat === 'book'}}">
+    <view class="sec-title">📖 图书专属信息</view>
+    <view class="field"><text class="label">ISBN</text><input class="input" value="{{isbn}}" data-field="isbn" bindinput="onInput" /></view>
+    <view class="field"><text class="label">作者</text><input class="input" value="{{author}}" data-field="author" bindinput="onInput" /></view>
+    <view class="field"><text class="label">出版社</text><input class="input" value="{{publisher}}" data-field="publisher" bindinput="onInput" /></view>
+    <view class="field"><text class="label">版次</text><input class="input" value="{{edition}}" data-field="edition" bindinput="onInput" /></view>
+    <view class="field">
+      <text class="label">适用学院</text>
+      <picker range="{{colleges}}" value="{{collegeIndex}}" bindchange="onCollege">
+        <view class="picker-val">{{colleges[collegeIndex]}} ›</view>
+      </picker>
+    </view>
+    <view class="field"><text class="label">课程</text><input class="input" value="{{course}}" data-field="course" bindinput="onInput" /></view>
+    <view class="field">
+      <text class="label">笔记等级</text>
+      <picker range="{{noteLevels}}" value="{{noteIndex}}" bindchange="onNote">
+        <view class="picker-val">{{noteLevel}} ›</view>
+      </picker>
+    </view>
+    <view class="field"><text class="label">笔记说明</text><input class="input" value="{{noteDesc}}" data-field="noteDesc" bindinput="onInput" /></view>
+    <view class="field"><text class="label">缺损</text><input class="input" value="{{defects}}" data-field="defects" bindinput="onInput" /></view>
+    <view class="inner-upload">
+      <text class="label">内页照片</text>
+      <view class="img-list">
+        <view class="img-item" wx:for="{{innerPhotos}}" wx:key="*this">
+          <image class="img" src="{{item}}" mode="aspectFill" />
+          <view class="img-del" catchtap="removeInner" data-i="{{index}}">×</view>
+        </view>
+        <view class="img-add" bindtap="chooseInner">＋</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="btn-row">
+    <view class="btn-ghost half" bindtap="saveDraft">存草稿</view>
+    <view class="btn-brand half" bindtap="onPublish">{{submitting ? '发布中…' : '发布'}}</view>
+  </view>
+</view>

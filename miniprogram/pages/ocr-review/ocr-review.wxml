@@ -1,0 +1,82 @@
+<view class="page">
+  <view class="head-tip">
+    共 {{list.length}} 本待确认。书名、笔记等级、价格逐本必填；校区/成色/学院可批量设置。
+  </view>
+
+  <!-- 批量设置 -->
+  <view class="batch card">
+    <view class="sec-title">批量设置</view>
+    <view class="brow">
+      <picker range="{{campusList}}" value="{{campusIndex}}" bindchange="onBatchCampus">
+        <view class="pick">{{campusList[campusIndex]}} ▾</view>
+      </picker>
+      <picker range="{{conditions}}" value="{{conditionIndex}}" bindchange="onBatchCond">
+        <view class="pick">{{conditions[conditionIndex]}} ▾</view>
+      </picker>
+      <picker range="{{colleges}}" value="{{collegeIndex}}" bindchange="onBatchCollege">
+        <view class="pick">{{colleges[collegeIndex]}} ▾</view>
+      </picker>
+    </view>
+    <view class="brow">
+      <input class="batch-price" type="digit" placeholder="统一价格（元）" value="{{batchPrice}}" bindinput="onBatchPrice" />
+      <view class="apply" bindtap="applyBatch">应用到全部价格</view>
+    </view>
+  </view>
+
+  <!-- 逐本 -->
+  <view class="book card" wx:for="{{list}}" wx:key="id" wx:for-index="bi">
+    <view class="bk-head">
+      <text class="bk-idx">第 {{bi + 1}} 本</text>
+      <text class="bk-del" catchtap="onDelete" data-i="{{bi}}">删除</text>
+    </view>
+
+    <view class="field">
+      <text class="label">书名 *</text>
+      <input class="input" value="{{item.title}}" data-i="{{bi}}" data-field="title" bindinput="onItemInput" />
+    </view>
+    <view class="field">
+      <text class="label">ISBN</text>
+      <input class="input" value="{{item.isbn}}" data-i="{{bi}}" data-field="isbn" bindinput="onItemInput" />
+    </view>
+    <view class="field">
+      <text class="label">作者</text>
+      <input class="input" value="{{item.author}}" data-i="{{bi}}" data-field="author" bindinput="onItemInput" />
+    </view>
+    <view class="field">
+      <text class="label">出版社</text>
+      <input class="input" value="{{item.publisher}}" data-i="{{bi}}" data-field="publisher" bindinput="onItemInput" />
+    </view>
+    <view class="field">
+      <text class="label">版次</text>
+      <input class="input" value="{{item.edition}}" data-i="{{bi}}" data-field="edition" bindinput="onItemInput" />
+    </view>
+    <view class="field">
+      <text class="label">价格 *</text>
+      <input class="input" type="digit" placeholder="元" value="{{item.price}}" data-i="{{bi}}" data-field="price" bindinput="onItemInput" />
+    </view>
+
+    <view class="note-row">
+      <text class="label">笔记等级 *</text>
+      <view class="chips">
+        <view
+          class="chip {{item.noteLevel === nv ? 'on' : ''}}"
+          wx:for="{{noteLevels}}"
+          wx:for-item="nv"
+          wx:for-index="ni"
+          wx:key="*this"
+          bindtap="onNote"
+          data-i="{{bi}}"
+          data-level="{{nv}}">{{nv}}</view>
+      </view>
+    </view>
+
+    <view class="raw" wx:if="{{item.rawText}}">识别原文：{{item.rawText}}</view>
+  </view>
+
+  <view class="empty" wx:if="{{!list.length}}">
+    <view class="empty-emoji">📚</view>
+    <view class="empty-text">没有待确认的书，回去重拍或扫码</view>
+  </view>
+
+  <view class="btn-brand pub-btn" wx:if="{{list.length}}" bindtap="onPublish">{{publishing ? '发布中…' : '确认并全部发布'}}</view>
+</view>

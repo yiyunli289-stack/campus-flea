@@ -1,0 +1,30 @@
+<view class="page">
+  <view class="intro">
+    <view class="intro-title">批量录入图书</view>
+    <view class="intro-sub">拍书脊自动识别，或连续扫 ISBN；识别结果逐本确认后才发布</view>
+  </view>
+
+  <!-- 拍照识别 -->
+  <view class="section card">
+    <view class="sec-title">📷 拍照识别（最多 3 张）</view>
+    <view class="tip">拍摄技巧：把书<b>平放、书脊横向</b>对齐，文字清晰、避免反光和遮挡，识别率最高。</view>
+    <view class="img-list">
+      <view class="img-item" wx:for="{{images}}" wx:key="*this">
+        <image class="img" src="{{item}}" mode="aspectFill" />
+        <view class="img-del" catchtap="removeImage" data-i="{{index}}">×</view>
+      </view>
+      <view class="img-add" wx:if="{{images.length < 3}}" bindtap="chooseImages">＋</view>
+    </view>
+    <view class="btn-brand recog-btn" bindtap="recognize">{{processing ? '识别中…' : '开始识别'}}</view>
+  </view>
+
+  <!-- 扫码 -->
+  <view class="section card">
+    <view class="sec-title">🔖 ISBN 连续扫码</view>
+    <view class="tip">教材背面都有条码，扫到的 ISBN 100% 准确，逐本扫即可批量加。</view>
+    <view class="scan-list" wx:if="{{scanList.length}}">
+      <view class="scan-item" wx:for="{{scanList}}" wx:key="isbn">{{index + 1}}. {{item.isbn}}</view>
+    </view>
+    <view class="btn-brand recog-btn" bindtap="scanIsbn">开始扫码</view>
+  </view>
+</view>

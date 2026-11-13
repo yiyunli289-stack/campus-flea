@@ -1,0 +1,47 @@
+<view class="page">
+  <view class="tabs">
+    <view class="tab {{tab === 'received' ? 'on' : ''}}" bindtap="onTab" data-tab="received">收到的报价</view>
+    <view class="tab {{tab === 'sent' ? 'on' : ''}}" bindtap="onTab" data-tab="sent">我发出的</view>
+  </view>
+
+  <!-- 收到的报价 -->
+  <block wx:if="{{tab === 'received'}}">
+    <view class="offer card" wx:for="{{received}}" wx:key="_id">
+      <view class="o-top">
+        <view class="o-user">{{item.buyerName}}<text class="o-college" wx:if="{{item.buyerCollege}}"> · {{item.buyerCollege}}</text></view>
+        <view class="o-price">¥{{item.priceText}}</view>
+      </view>
+      <view class="o-goods">商品：{{item.goodsTitle}}</view>
+      <view class="o-msg" wx:if="{{item.message}}">留言：{{item.message}}</view>
+      <view class="o-time">{{item.timeText}}</view>
+      <view class="o-status st-{{item.status}}">{{item.statusText}}</view>
+      <view class="o-contact" wx:if="{{item.status === 'accepted' && item.buyerContact}}">买家联系：{{item.buyerContact}}</view>
+      <view class="o-actions">
+        <view class="o-btn primary" wx:if="{{item.status === 'pending'}}" bindtap="onAccept" data-id="{{item._id}}">接受此报价</view>
+        <view class="o-btn" wx:if="{{item.status === 'accepted'}}" bindtap="onChat" data-goods-id="{{item.goodsId}}">去聊天</view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 我发出的报价 -->
+  <block wx:if="{{tab === 'sent'}}">
+    <view class="offer card" wx:for="{{sent}}" wx:key="_id">
+      <view class="o-top">
+        <view class="o-goods">商品：{{item.goodsTitle}}</view>
+        <view class="o-price">¥{{item.priceText}}</view>
+      </view>
+      <view class="o-time">{{item.timeText}}</view>
+      <view class="o-status st-{{item.status}}">{{item.statusText}}</view>
+      <view class="o-contact" wx:if="{{item.status === 'accepted' && item.sellerContact}}">卖家联系：{{item.sellerContact}}</view>
+      <view class="o-actions">
+        <view class="o-btn" wx:if="{{item.status === 'pending'}}" bindtap="onCancel" data-id="{{item._id}}">取消报价</view>
+        <view class="o-btn" wx:if="{{item.status === 'accepted'}}" bindtap="onChat" data-goods-id="{{item.goodsId}}">去聊天</view>
+      </view>
+    </view>
+  </block>
+
+  <view class="empty" wx:if="{{!received.length && !sent.length}}">
+    <view class="empty-emoji">💰</view>
+    <view class="empty-text">暂无报价</view>
+  </view>
+</view>

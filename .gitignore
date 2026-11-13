@@ -1,0 +1,17 @@
+# 微信开发者工具的个人私有配置（含本机设置，不参与协作）
+project.private.config.json
+
+# 依赖
+node_modules/
+miniprogram_npm/
+cloudfunctions/**/node_modules/
+
+# 日志与系统文件
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# 编辑器
+.idea/
+.vscode/

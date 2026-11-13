@@ -1,0 +1,47 @@
+<view class="page">
+  <!-- 用户信息头 -->
+  <view class="head">
+    <view class="avatar">
+      <image wx:if="{{userInfo && userInfo.avatarUrl}}" class="avatar-img" src="{{userInfo.avatarUrl}}" />
+      <text wx:else class="avatar-emoji">👤</text>
+    </view>
+
+    <block wx:if="{{userInfo && userInfo.nickName}}">
+      <view class="info">
+        <view class="name">{{userInfo.nickName}}</view>
+        <view class="sub">{{userInfo.campus}}{{userInfo.college ? ' · ' + userInfo.college : ''}}</view>
+      </view>
+      <view class="edit" bindtap="onEditProfile">编辑资料</view>
+    </block>
+
+    <block wx:else>
+      <view class="info" bindtap="onLogin">
+        <view class="name">点击登录</view>
+        <view class="sub">登录后可发布、报价、聊天</view>
+      </view>
+      <view class="edit login-btn" bindtap="onLogin">登录</view>
+    </block>
+  </view>
+
+  <!-- 功能菜单 -->
+  <view class="menu card">
+    <view class="menu-item" wx:for="{{menu}}" wx:key="text" bindtap="onMenu" data-url="{{item.url}}">
+      <view class="m-icon">{{item.icon}}</view>
+      <view class="m-text">{{item.text}}</view>
+    </view>
+  </view>
+
+  <!-- 次要列表 -->
+  <view class="sec-list card">
+    <view class="sec-item" bindtap="onSeed">
+      <text class="sec-icon">🧪</text>
+      <text class="sec-text">初始化演示数据</text>
+      <text class="sec-arrow">›</text>
+    </view>
+    <view class="sec-item" bindtap="onAbout">
+      <text class="sec-icon">ℹ️</text>
+      <text class="sec-text">关于本程序</text>
+      <text class="sec-arrow">›</text>
+    </view>
+  </view>
+</view>

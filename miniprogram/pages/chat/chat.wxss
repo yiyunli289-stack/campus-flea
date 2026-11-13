@@ -1,0 +1,94 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;      /* 锁死页面横向/纵向滚动，滚动只交给 scroll-view */
+}
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 20rpx 24rpx;
+  box-sizing: border-box;
+  background: var(--white);
+  border-bottom: 1rpx solid var(--border);
+}
+.chat-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.chat-contact {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  color: var(--brand);
+  border: 1rpx solid var(--brand);
+  border-radius: 32rpx;
+  padding: 8rpx 20rpx;
+  white-space: nowrap;
+}
+
+/* 滚动层：不要放 padding，负责滚动 */
+.msg-list {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+/* 内容层：padding 放这里 */
+.msg-inner {
+  padding: 24rpx;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.sys { text-align: center; font-size: 22rpx; color: var(--text-3); margin: 20rpx 0; }
+.bubble-row { display: flex; justify-content: flex-start; margin: 16rpx 0; }
+.bubble-row.mine { justify-content: flex-end; }
+.bubble {
+  max-width: 70%;
+  background: var(--white);
+  padding: 18rpx 24rpx;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: var(--text);
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  box-sizing: border-box;
+}
+.bubble-row.mine .bubble { background: var(--brand); color: #fff; }
+
+.input-bar {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  background: var(--white);
+  border-top: 1rpx solid var(--border);
+}
+.ib-input {
+  flex: 1;
+  min-width: 0;          /* 关键：输入框不撑破 flex 布局 */
+  background: var(--bg);
+  border-radius: 40rpx;
+  padding: 14rpx 28rpx;
+  font-size: 28rpx;
+}
+.ib-send {
+  flex-shrink: 0;
+  background: var(--brand);
+  color: #fff;
+  font-size: 26rpx;
+  padding: 16rpx 32rpx;
+  border-radius: 40rpx;
+}

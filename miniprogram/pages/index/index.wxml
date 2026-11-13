@@ -1,0 +1,65 @@
+<view class="page">
+  <!-- 顶部：校区 + 搜索 + 消息 -->
+  <view class="header">
+    <view class="campus" bindtap="onPickCampus">{{campus}} ▾</view>
+    <view class="search-bar" bindtap="goSearch">
+      <text class="search-icon">🔍</text>
+      <text class="search-placeholder">搜索书籍 / 数码 / 生活…</text>
+    </view>
+    <view class="msg-entry" bindtap="goMessage">💬</view>
+  </view>
+
+  <!-- 学院书单区 -->
+  <view class="booklist-card">
+    <view class="bl-head" bindtap="goCollege">
+      <view class="bl-title">📖 学院书单</view>
+      <view class="bl-sub">按学院找教材 · 川大全部学院</view>
+    </view>
+    <scroll-view class="bl-chips" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="bl-chip" wx:for="{{hotColleges}}" wx:key="*this" bindtap="onHotCollege" data-college="{{item}}">{{item}}</view>
+    </scroll-view>
+    <view class="bl-more" bindtap="goCollege">全部学院 ›</view>
+  </view>
+
+  <!-- 全品类金刚区 -->
+  <view class="grid card">
+    <view class="grid-item" wx:for="{{categories}}" wx:key="key" bindtap="onCategory" data-key="{{item.key}}">
+      <view class="grid-icon">{{item.icon}}</view>
+      <view class="grid-name">{{item.name}}</view>
+    </view>
+  </view>
+
+  <!-- 分类切换 -->
+  <view class="tabs">
+    <view class="tab {{activeTab === 'all' ? 'active' : ''}}" bindtap="onTab" data-tab="all">全品类</view>
+    <view class="tab {{activeTab === 'book' ? 'active' : ''}}" bindtap="onTab" data-tab="book">二手书</view>
+  </view>
+
+  <!-- 商品流 -->
+  <view class="goods">
+    <view class="goods-item card" wx:for="{{goods}}" wx:key="_id" bindtap="goDetail" data-id="{{item._id}}">
+      <view class="cover">
+        <image wx:if="{{item.images && item.images.length}}" class="cover-img" src="{{item.images[0]}}" mode="aspectFill" />
+        <view wx:else class="cover-ph"><text class="cover-emoji">{{item.emoji}}</text></view>
+        <view class="tag" wx:if="{{item.tradeType === '竞价'}}">竞价</view>
+      </view>
+      <view class="g-body">
+        <view class="g-title">{{item.title}}</view>
+        <view class="g-meta">
+          <text class="price">¥{{item.priceText}}</text>
+          <text class="condition">{{item.condition}}</text>
+        </view>
+        <view class="g-campus">📍 {{item.campus}}</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空态 -->
+  <view class="empty" wx:if="{{!goods.length && !loading}}">
+    <view class="empty-emoji">🛍️</view>
+    <view class="empty-text">该校区还没有商品</view>
+    <view class="empty-sub">去「发布」发第一件，或在「我的」页初始化演示数据</view>
+  </view>
+
+  <view class="footer-tip" wx:if="{{goods.length}}">— 已经到底了 —</view>
+</view>

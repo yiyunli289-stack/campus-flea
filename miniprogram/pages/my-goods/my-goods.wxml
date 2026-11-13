@@ -1,0 +1,27 @@
+<view class="page">
+  <view class="item card" wx:for="{{list}}" wx:key="_id" bindtap="goDetail" data-id="{{item._id}}">
+    <view class="i-row">
+      <view class="i-cover">
+        <image wx:if="{{item.images && item.images.length}}" class="i-img" src="{{item.images[0]}}" mode="aspectFill" />
+        <text wx:else class="i-emoji">{{item.emoji}}</text>
+      </view>
+      <view class="i-main">
+        <view class="i-title">{{item.title}}</view>
+        <view class="i-meta">¥{{item.priceText}} · {{item.timeText}}</view>
+        <view class="i-status s-{{item.status}}">{{statusText[item.status]}}</view>
+      </view>
+    </view>
+    <view class="i-actions">
+      <view class="i-btn" wx:if="{{item.status === 'on'}}" catchtap="onOffers" data-id="{{item._id}}">查看报价</view>
+      <view class="i-btn" wx:if="{{item.status === 'on'}}" catchtap="onOffShelf" data-id="{{item._id}}">下架</view>
+      <view class="i-btn primary" wx:if="{{item.status === 'locked'}}" catchtap="onComplete" data-id="{{item._id}}">确认成交</view>
+      <view class="i-btn" wx:if="{{item.status === 'off'}}" catchtap="onRelist" data-id="{{item._id}}">重新上架</view>
+    </view>
+  </view>
+
+  <view class="empty" wx:if="{{!list.length}}">
+    <view class="empty-emoji">📦</view>
+    <view class="empty-text">还没有发布商品</view>
+    <view class="empty-sub">去「发布」发第一件</view>
+  </view>
+</view>

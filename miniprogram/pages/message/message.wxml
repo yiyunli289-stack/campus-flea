@@ -1,0 +1,30 @@
+<view class="page">
+  <view class="empty" wx:if="{{!loggedIn}}">
+    <view class="empty-emoji">💬</view>
+    <view class="empty-text">登录后可查看消息</view>
+    <view class="btn-brand login" bindtap="goLogin">去登录</view>
+  </view>
+
+  <block wx:else>
+    <view class="conv card" wx:for="{{list}}" wx:key="_id" bindtap="goChat" data-id="{{item._id}}">
+      <view class="c-cover">
+        <image wx:if="{{item.goodsCover}}" class="c-img" src="{{item.goodsCover}}" mode="aspectFill" />
+        <text wx:else class="c-emoji">💬</text>
+      </view>
+      <view class="c-main">
+        <view class="c-top">
+          <text class="c-name">{{item.otherName}}</text>
+          <text class="c-time">{{item.timeText}}</text>
+        </view>
+        <view class="c-title">{{item.goodsTitle}}</view>
+        <view class="c-msg">{{item.lastMsg || '暂无消息'}}</view>
+      </view>
+      <view class="c-badge" wx:if="{{item.unread}}">{{item.unread}}</view>
+    </view>
+
+    <view class="empty" wx:if="{{!list.length}}">
+      <view class="empty-emoji">🕊️</view>
+      <view class="empty-text">还没有会话，去商品详情页「聊一聊」吧</view>
+    </view>
+  </block>
+</view>

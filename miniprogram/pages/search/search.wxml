@@ -1,0 +1,63 @@
+<view class="page">
+  <!-- 搜索框 -->
+  <view class="search-top">
+    <view class="search-input">
+      <text class="si-icon">🔍</text>
+      <input class="si-input" placeholder="搜索标题关键词" value="{{keyword}}" bindinput="onKeyword" confirm-type="search" bindconfirm="doSearch" />
+    </view>
+    <view class="search-btn" bindtap="doSearch">搜索</view>
+  </view>
+
+  <!-- 分类 -->
+  <scroll-view class="cat-row" scroll-x enhanced show-scrollbar="{{false}}">
+    <view class="cat-chip {{cat === item.key ? 'on' : ''}}" wx:for="{{cats}}" wx:key="key" bindtap="onCat" data-key="{{item.key}}">{{item.name}}</view>
+  </scroll-view>
+
+  <!-- 筛选 -->
+  <view class="filters card">
+    <picker range="{{campusOptions}}" value="{{campusIndex}}" bindchange="onCampus">
+      <view class="f-item">{{campusOptions[campusIndex]}} ▾</view>
+    </picker>
+    <picker range="{{collegeOptions}}" value="{{collegeIndex}}" bindchange="onCollege">
+      <view class="f-item">{{collegeOptions[collegeIndex]}} ▾</view>
+    </picker>
+    <picker range="{{conditionOptions}}" value="{{condIndex}}" bindchange="onCond">
+      <view class="f-item">{{conditionOptions[condIndex]}} ▾</view>
+    </picker>
+    <picker range="{{tradeOptions}}" value="{{tradeIndex}}" bindchange="onTrade">
+      <view class="f-item">{{tradeOptions[tradeIndex]}} ▾</view>
+    </picker>
+    <view class="f-price">
+      <input class="price-input" type="digit" placeholder="最低" value="{{priceMin}}" bindinput="onMin" />
+      <text class="price-sep">—</text>
+      <input class="price-input" type="digit" placeholder="最高" value="{{priceMax}}" bindinput="onMax" />
+    </view>
+    <view class="f-reset" bindtap="reset">重置</view>
+  </view>
+
+  <view class="result-count" wx:if="{{searched}}">共 {{list.length}} 件</view>
+
+  <!-- 结果 -->
+  <view class="goods">
+    <view class="goods-item card" wx:for="{{list}}" wx:key="_id" bindtap="goDetail" data-id="{{item._id}}">
+      <view class="cover">
+        <image wx:if="{{item.images && item.images.length}}" class="cover-img" src="{{item.images[0]}}" mode="aspectFill" />
+        <view wx:else class="cover-ph"><text class="cover-emoji">{{item.emoji}}</text></view>
+        <view class="tag" wx:if="{{item.tradeType === '竞价'}}">竞价</view>
+      </view>
+      <view class="g-body">
+        <view class="g-title">{{item.title}}</view>
+        <view class="g-meta">
+          <text class="price">¥{{item.priceText}}</text>
+          <text class="condition">{{item.condition}}</text>
+        </view>
+        <view class="g-campus">📍 {{item.campus}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty" wx:if="{{searched && !list.length && !loading}}">
+    <view class="empty-emoji">🔍</view>
+    <view class="empty-text">没有找到相关商品</view>
+  </view>
+</view>

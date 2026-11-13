@@ -1,0 +1,44 @@
+.page { padding: 24rpx; }
+
+.form { padding: 32rpx 28rpx; }
+.form-title { font-size: 34rpx; font-weight: 700; color: var(--text); }
+.form-sub { font-size: 24rpx; color: var(--text-3); margin: 10rpx 0 28rpx; }
+
+.avatar-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  background: none;
+  border: none;
+  padding: 0 0 32rpx;
+  line-height: 1.4;
+}
+.avatar-btn::after { border: none; }
+.avatar-img {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 50%;
+  background: var(--brand-light);
+}
+.avatar-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64rpx;
+}
+.avatar-tip { font-size: 24rpx; color: var(--text-3); }
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 26rpx 0;
+  border-top: 1rpx solid var(--border);
+}
+.label { width: 160rpx; flex-shrink: 0; font-size: 28rpx; color: var(--text); }
+.input { flex: 1; font-size: 28rpx; }
+.picker { flex: 1; }
+.picker-val { font-size: 28rpx; color: var(--text); }
+
+.save-btn { margin-top: 40rpx; }

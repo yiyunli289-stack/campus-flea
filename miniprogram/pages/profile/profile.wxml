@@ -1,0 +1,44 @@
+<view class="page">
+  <view class="form card">
+    <view class="form-title">完善个人资料</view>
+    <view class="form-sub">发布、报价或聊天前需补全昵称、校区和联系方式</view>
+
+    <!-- 头像 -->
+    <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+      <image wx:if="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" />
+      <view wx:else class="avatar-img avatar-empty">👤</view>
+      <text class="avatar-tip">点击选择头像</text>
+    </button>
+
+    <view class="field">
+      <text class="label">昵称</text>
+      <input class="input" type="nickname" placeholder="请输入昵称" value="{{nickName}}" bindinput="onNickName" />
+    </view>
+
+    <view class="field">
+      <text class="label">校区</text>
+      <picker class="picker" range="{{campusList}}" value="{{campusIndex}}" bindchange="onCampus">
+        <view class="picker-val">{{campusList[campusIndex] || '请选择校区'}} ›</view>
+      </picker>
+    </view>
+
+    <view class="field">
+      <text class="label">学院</text>
+      <picker class="picker" range="{{colleges}}" value="{{collegeIndex}}" bindchange="onCollege">
+        <view class="picker-val">{{college || '请选择学院'}} ›</view>
+      </picker>
+    </view>
+
+    <view class="field">
+      <text class="label">专业</text>
+      <input class="input" placeholder="选填" value="{{major}}" bindinput="onMajor" />
+    </view>
+
+    <view class="field">
+      <text class="label">联系方式</text>
+      <input class="input" placeholder="微信 / QQ / 手机号（至少一种）" value="{{contact}}" bindinput="onContact" />
+    </view>
+  </view>
+
+  <view class="btn-brand save-btn" bindtap="onSave">保存</view>
+</view>

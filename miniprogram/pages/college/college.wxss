@@ -1,0 +1,30 @@
+.page { padding: 0 24rpx 40rpx; }
+
+.intro {
+  font-size: 24rpx;
+  color: var(--text-3);
+  padding: 20rpx 8rpx;
+}
+
+.group { margin-bottom: 28rpx; }
+.group-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--brand);
+  padding: 12rpx 8rpx;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 1;
+}
+
+.college-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 24rpx;
+  border-bottom: 1rpx solid var(--border);
+}
+.college-item:last-child { border-bottom: none; }
+.ci-name { font-size: 30rpx; color: var(--text); }
+.ci-arrow { color: var(--text-3); font-size: 32rpx; }

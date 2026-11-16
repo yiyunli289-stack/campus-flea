@@ -55,11 +55,13 @@ async function diag() {
     });
     out.ocrTest = { ok: true, items: ((r && r.items) || []).length };
   } catch (e) {
-    out.ocrTest = {
-      ok: false,
-      errCode: (e && (e.errCode || e.code)) || '',
-      errMsg: (e && (e.errMsg || e.message)) || String(e)
-    };
+    const errMsg = (e && (e.errMsg || e.message)) || String(e);
+    const errCode = (e && (e.errCode || e.code)) || '';
+    out.ocrTest = { ok: false, errCode, errMsg };
+    if (/101003|market quota/i.test(errMsg + ' ' + errCode)) {
+      out.ocrTest.hint = 'needs_activate';
+      out.ocrTest.note = '接口已授权，但微信服务市场的 OCR 服务未订购，免费额度未生效';
+    }
     console.error('diag ocr error:', e);
   }
   return { code: 0, data: out };
@@ -296,8 +298,18 @@ async function ocrImage(event) {
           '这种情况拍照识别不可用，请改用 ISBN 连续扫码。'
       };
     }
+    // 101003 = not enough market quota：OCR 服务未在微信服务市场订购，免费额度根本没生效
+    if (/101003|market quota/.test(tag)) {
+      return {
+        code: -1,
+        needActivate: true,
+        msg:
+          '微信 OCR 服务尚未开通（101003 服务市场配额不足）。免费额度需要先在小程序管理后台「服务市场」' +
+          '0 元订购「通用印刷体识别」才会生效；未开通前请改用下方的 ISBN 连续扫码，扫码不依赖这个服务。'
+      };
+    }
     if (/45009|quota|limit|超出|频率|beyond/.test(tag)) {
-      return { code: -1, msg: 'OCR 免费额度已用完或调用过于频繁（' + (code || raw) + '），请稍后再试或改用连续扫码' };
+      return { code: -1, msg: 'OCR 今日免费额度已用完或调用过于频繁（' + (code || raw) + '），请明天再试或改用 ISBN 扫码' };
     }
     if (/-501000|not found|ResourceNotFound/i.test(tag)) {
       return { code: -1, msg: 'ocr 云函数不存在（-501000）：请确认已部署到当前环境 cloud1-d5gody0jj8418ae20' };

@@ -184,6 +184,19 @@ Page({
       wx.showModal({ title: '云函数不可用', content: e.friendly, showCancel: false });
       return;
     }
+    const r = (e && e.rawResult) || {};
+    if (r.needActivate) {
+      wx.showModal({
+        title: '拍照识别需要先开通',
+        content: r.msg,
+        confirmText: '改用扫码',
+        cancelText: '知道了',
+        success: (m) => {
+          if (m.confirm) this.scanIsbn();
+        }
+      });
+      return;
+    }
     const msg = (e && (e.message || e.errMsg)) || '操作失败';
     const code = (e && e.errCode) || '';
     const text = String(msg).slice(0, 300) + (code ? '\n错误码：' + code : '');
@@ -218,14 +231,18 @@ Page({
             '错误：' + (d.ocrTest.errMsg || '未知') + (d.ocrTest.errCode ? '（' + d.ocrTest.errCode + '）' : '')
           );
         }
+        const needActivate = !!(d.ocrTest && d.ocrTest.hint === 'needs_activate');
+        if (needActivate) lines.push('结论：接口已授权，但服务市场未订购 OCR');
         const text = lines.join('\n');
         wx.showModal({
           title: '识别服务检测',
           content: text,
-          confirmText: '复制',
+          confirmText: needActivate ? '改用扫码' : '复制',
           cancelText: '关闭',
           success: (r) => {
-            if (r.confirm) wx.setClipboardData({ data: text });
+            if (!r.confirm) return;
+            if (needActivate) this.scanIsbn();
+            else wx.setClipboardData({ data: text });
           }
         });
       })

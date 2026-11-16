@@ -8,6 +8,7 @@
   <view class="section card">
     <view class="sec-title">📷 拍照识别（最多 3 张）</view>
     <view class="tip">拍摄技巧：把书<b>平放、书脊横向</b>对齐，文字清晰、避免反光和遮挡，识别率最高。</view>
+    <view class="tip warn">拍照识别依赖微信服务市场的 OCR 服务：需在小程序管理后台「服务市场」0 元订购「通用印刷体识别」，每天 100 次免费额度。没开通时会报 101003，改用下面的 ISBN 扫码即可。</view>
     <view class="img-list">
       <view class="img-item" wx:for="{{images}}" wx:key="*this">
         <image class="img" src="{{item}}" mode="aspectFill" />

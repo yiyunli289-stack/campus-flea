@@ -26,7 +26,11 @@
   <!-- 逐本 -->
   <view class="book card" wx:for="{{list}}" wx:key="id" wx:for-index="bi">
     <view class="bk-head">
-      <text class="bk-idx">第 {{bi + 1}} 本</text>
+      <image class="bk-cover" wx:if="{{item.cover}}" src="{{item.cover}}" mode="aspectFill" />
+      <view class="bk-info">
+        <text class="bk-idx">第 {{bi + 1}} 本</text>
+        <text class="bk-sub" wx:if="{{item.pubDate}}">{{item.pubDate}}</text>
+      </view>
       <text class="bk-del" catchtap="onDelete" data-i="{{bi}}">删除</text>
     </view>
 

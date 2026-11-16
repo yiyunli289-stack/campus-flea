@@ -1,16 +1,206 @@
-// 云函数：图书识别
+// 云函数：图书识别 + ISBN 书目查询
 // 路线 A（免费）：微信云开发 OCR cloud.openapi.ocr.printedText + 自建书脊切分
-// 路线 C（免费）：ISBN 连续扫码，由小程序端处理，不走本函数
+// 路线 C（免费）：ISBN 连续扫码；isbnLookup 用豆瓣 ISBN 页补齐书名/作者/出版社/封面
 const cloud = require('wx-server-sdk');
+const https = require('https');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
+
+const UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
+const MEM = Object.create(null); // 单实例内存缓存，避免重复请求豆瓣
+const MEM_TTL = 6 * 60 * 60 * 1000;
 
 exports.main = async (event) => {
   const { action } = event || {};
   const { OPENID } = cloud.getWXContext();
   if (!OPENID) return { code: -1, msg: '未登录' };
+
   if (action === 'ocrImage') return ocrImage(event);
+  if (action === 'isbnLookup') return isbnLookup(event);
+  if (action === 'isbnBatch') return isbnBatch(event);
   return { code: -1, msg: '未知操作' };
 };
+
+/* ============================ ISBN 书目查询 ============================ */
+
+async function isbnLookup(event) {
+  const isbn = normalizeIsbn(event.isbn);
+  if (!isbn) return { code: -1, msg: 'ISBN 位数不对（需 10 或 13 位）' };
+
+  const book = await lookupIsbn(isbn);
+  return { code: 0, data: book };
+}
+
+async function isbnBatch(event) {
+  const list = Array.from(new Set((event.isbns || []).map(normalizeIsbn).filter(Boolean))).slice(0, 20);
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    out.push(await lookupIsbn(list[i]));
+    if (i < list.length - 1) await sleep(200);
+  }
+  return { code: 0, data: { list: out } };
+}
+
+async function lookupIsbn(isbn) {
+  const hit = MEM[isbn];
+  if (hit && Date.now() - hit.t < MEM_TTL) return hit.data;
+
+  // 先验校验位：豆瓣对非法 ISBN 会回退到无关条目
+  if (!to13(isbn)) {
+    const bad = { isbn, found: false, note: 'ISBN 校验位不正确，请核对条码' };
+    MEM[isbn] = { t: Date.now(), data: bad };
+    return bad;
+  }
+
+  let book;
+  try {
+    const html = await fetchText('https://book.douban.com/isbn/' + isbn + '/', {
+      referer: 'https://book.douban.com/'
+    });
+    book = parseDouban(html, isbn);
+  } catch (e) {
+    console.error('douban lookup failed', isbn, e && (e.message || e.errMsg));
+    book = { isbn, found: false, note: '书目服务暂时不可用，可稍后重试或手填' };
+  }
+
+  if (book.found && book.coverUrl) {
+    book.coverFileID = await cacheCover(isbn, book.coverUrl);
+  }
+  delete book.coverUrl;
+
+  MEM[isbn] = { t: Date.now(), data: book };
+  return book;
+}
+
+function parseDouban(html, isbn) {
+  if (!html || html.length < 800) return { isbn, found: false };
+
+  const og = (prop) => {
+    const m = html.match(new RegExp('<meta property="og:' + prop + '" content="([^"]*)"'));
+    return m ? decodeHtml(m[1]).trim() : '';
+  };
+
+  let ld = null;
+  const mld = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  if (mld) {
+    try {
+      ld = JSON.parse(mld[1]);
+    } catch (e) {
+      ld = null;
+    }
+  }
+
+  const title = ((ld && ld.name) || og('title') || '').trim();
+  if (!title) return { isbn, found: false };
+
+  // 豆瓣条目自带 ISBN 时做一次交叉校验，避免拿到错书
+  const ldIsbn = ld && ld.isbn ? normalizeIsbn(ld.isbn) : '';
+  if (ldIsbn && to13(ldIsbn) && to13(ldIsbn) !== to13(isbn)) {
+    return { isbn, found: false, note: '豆瓣条目与 ISBN 不一致' };
+  }
+
+  let author = '';
+  if (ld && Array.isArray(ld.author)) {
+    author = ld.author
+      .map((a) => (a && a.name ? a.name : ''))
+      .filter(Boolean)
+      .join(' / ');
+  }
+  if (!author) author = infoValue(html, '作者');
+
+  const priceText = infoValue(html, '定价');
+  const priceM = priceText.match(/(\d+(?:\.\d+)?)/);
+
+  return {
+    isbn,
+    found: true,
+    title,
+    author,
+    publisher: infoValue(html, '出版社'),
+    pubDate: infoValue(html, '出版时间'),
+    price: priceM ? Number(priceM[1]) : 0,
+    summary: og('description').slice(0, 120),
+    coverUrl: og('image'),
+    url: og('url'),
+    source: 'douban'
+  };
+}
+
+// 取 douban 详情页 #info 区块里的字段，如「出版社」「出版时间」「定价」
+function infoValue(html, label) {
+  const re = new RegExp(
+    '<span class="pl">\\s*' + label + '\\s*:?\\s*</span>\\s*([\\s\\S]{0,300}?)(?:<br\\s*/?>|</div>)',
+    'i'
+  );
+  const m = html.match(re);
+  if (!m) return '';
+  return decodeHtml(m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+}
+
+function decodeHtml(s) {
+  return String(s || '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
+}
+
+// 豆瓣封面有防盗链，必须带 Referer 下载，再转存到云存储
+async function cacheCover(isbn, url) {
+  try {
+    const buf = await fetchBuffer(url, { referer: 'https://book.douban.com/' });
+    if (!buf || buf.length < 1000) return '';
+    const up = await cloud.uploadFile({
+      cloudPath: 'covers/' + isbn + '.jpg',
+      fileContent: buf
+    });
+    return up.fileID || '';
+  } catch (e) {
+    console.error('cover cache failed', isbn, e && (e.message || e.errMsg));
+    return '';
+  }
+}
+
+/* ============================== ISBN 工具 ============================== */
+
+function normalizeIsbn(raw) {
+  const s = String(raw || '')
+    .toUpperCase()
+    .replace(/[^0-9X]/g, '');
+  return s.length === 10 || s.length === 13 ? s : '';
+}
+
+function isbn13Valid(s) {
+  if (!/^\d{13}$/.test(s)) return false;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += Number(s[i]) * (i % 2 ? 3 : 1);
+  return (10 - (sum % 10)) % 10 === Number(s[12]);
+}
+
+function isbn10Valid(s) {
+  if (!/^\d{9}[\dX]$/.test(s)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += Number(s[i]) * (10 - i);
+  sum += s[9] === 'X' ? 10 : Number(s[9]);
+  return sum % 11 === 0;
+}
+
+// 统一成 13 位用于比较；非法返回 ''
+function to13(s) {
+  const n = normalizeIsbn(s);
+  if (!n) return '';
+  if (n.length === 13) return isbn13Valid(n) ? n : '';
+  if (!isbn10Valid(n)) return '';
+  const core = '978' + n.slice(0, 9);
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += Number(core[i]) * (i % 2 ? 3 : 1);
+  return core + ((10 - (sum % 10)) % 10);
+}
+
+/* ============================ 拍照 OCR 识别 ============================ */
 
 async function ocrImage(event) {
   const fileID = event.fileID;
@@ -32,15 +222,27 @@ async function ocrImage(event) {
     });
   } catch (e) {
     console.error('openapi ocr error', e);
-    return { code: -1, msg: 'OCR 调用失败：' + (e.errMsg || e.message || '未知') + '（可改用连续扫码）' };
+    const raw = (e && (e.errMsg || e.message)) || '未知';
+    if (/permission|权限|-501000/i.test(raw)) {
+      return {
+        code: -1,
+        msg: 'OCR 云调用未授权：确认 cloudfunctions/ocr/config.json 已声明 openapi 权限，并重新「上传并部署」'
+      };
+    }
+    return { code: -1, msg: 'OCR 调用失败：' + raw + '（可改用连续扫码）' };
   }
 
   const items = (res && res.items) || (res && res.result && res.result.items) || [];
   if (!items.length) {
-    return { code: 0, data: { books: [], note: '未识别到文字，请让书平放、书脊横向、清晰无遮挡后重拍' } };
+    return {
+      code: 0,
+      data: { books: [], note: '未识别到文字，请让书平放、书脊横向、清晰无遮挡后重拍' }
+    };
   }
   return { code: 0, data: { books: segment(items) } };
 }
+
+/* ============================== 书脊切分 ============================== */
 
 // 把 OCR 文本框按坐标聚成「一本书」
 function segment(items) {
@@ -86,7 +288,7 @@ function segment(items) {
   return groups.map((g) => {
     const lines = g
       .slice()
-      .sort((a, b) => (a.cx - b.cx) || (a.cy - b.cy))
+      .sort((a, b) => a.cx - b.cx || a.cy - b.cy)
       .map((b) => b.text);
     return buildBook(lines);
   });
@@ -136,4 +338,74 @@ function buildBook(lines) {
     raw: clean,
     confidence: Math.min(0.98, confidence)
   };
+}
+
+/* ============================== HTTP 工具 ============================== */
+
+function headers(opts) {
+  const h = {
+    'User-Agent': UA,
+    Accept: 'text/html,application/xhtml+xml,image/*,*/*;q=0.8',
+    'Accept-Language': 'zh-CN,zh;q=0.9'
+  };
+  if (opts && opts.referer) h.Referer = opts.referer;
+  return h;
+}
+
+function fetchText(url, opts, redirects) {
+  opts = opts || {};
+  redirects = redirects || 0;
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: headers(opts) }, (res) => {
+      const code = res.statusCode;
+      if (code >= 300 && code < 400 && res.headers.location && redirects < 4) {
+        res.resume();
+        let next = res.headers.location;
+        if (next.charAt(0) === '/') next = 'https://book.douban.com' + next;
+        return resolve(fetchText(next, opts, redirects + 1));
+      }
+      if (code !== 200) {
+        res.resume();
+        return reject(new Error('HTTP ' + code));
+      }
+      let data = '';
+      res.setEncoding('utf8');
+      res.on('data', (c) => {
+        data += c;
+        if (data.length > 3e6) req.destroy(new Error('response too large'));
+      });
+      res.on('end', () => resolve(data));
+    });
+    req.setTimeout(8000, () => req.destroy(new Error('timeout')));
+    req.on('error', reject);
+  });
+}
+
+function fetchBuffer(url, opts, redirects) {
+  opts = opts || {};
+  redirects = redirects || 0;
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: headers(opts) }, (res) => {
+      const code = res.statusCode;
+      if (code >= 300 && code < 400 && res.headers.location && redirects < 4) {
+        res.resume();
+        let next = res.headers.location;
+        if (next.charAt(0) === '/') next = 'https://book.douban.com' + next;
+        return resolve(fetchBuffer(next, opts, redirects + 1));
+      }
+      if (code !== 200) {
+        res.resume();
+        return reject(new Error('HTTP ' + code));
+      }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+    req.setTimeout(8000, () => req.destroy(new Error('timeout')));
+    req.on('error', reject);
+  });
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
 }

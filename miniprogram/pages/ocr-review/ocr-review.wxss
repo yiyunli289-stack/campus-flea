@@ -23,9 +23,15 @@
 }
 
 .book { padding: 28rpx; margin-bottom: 24rpx; }
-.bk-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12rpx; }
+.bk-head { display: flex; align-items: center; gap: 20rpx; margin-bottom: 12rpx; }
+.bk-cover {
+  width: 88rpx; height: 120rpx; flex-shrink: 0;
+  border-radius: 8rpx; background: var(--bg);
+}
+.bk-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .bk-idx { font-size: 28rpx; font-weight: 700; color: var(--brand); }
-.bk-del { font-size: 24rpx; color: var(--text-3); }
+.bk-sub { font-size: 22rpx; color: var(--text-3); margin-top: 4rpx; }
+.bk-del { flex-shrink: 0; font-size: 24rpx; color: var(--text-3); }
 
 .field { display: flex; align-items: center; gap: 20rpx; padding: 18rpx 0; border-top: 1rpx solid var(--border); }
 .label { width: 150rpx; flex-shrink: 0; font-size: 26rpx; color: var(--text-2); }

@@ -27,6 +27,8 @@ Page({
       publisher: b.publisher || '',
       edition: b.edition || '',
       isbn: b.isbn || '',
+      cover: b.coverFileID || b.cover || '',
+      pubDate: b.pubDate || '',
       price: '',
       noteLevel: '',
       rawText: (b.raw || []).join(' / ')
@@ -98,7 +100,7 @@ Page({
             price: Number(it.price),
             condition,
             campus,
-            images: [],
+            images: it.cover ? [it.cover] : [],
             isbn: it.isbn,
             author: it.author,
             publisher: it.publisher,

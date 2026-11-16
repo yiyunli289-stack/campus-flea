@@ -25,8 +25,32 @@
 
 .recog-btn { margin-top: 8rpx; }
 
+.hl { color: var(--brand); font-weight: 600; }
+
 .scan-list {
-  background: var(--bg); border-radius: 12rpx; padding: 16rpx 22rpx;
-  margin-bottom: 20rpx; max-height: 300rpx; overflow-y: auto;
+  background: var(--bg); border-radius: 12rpx; padding: 8rpx 22rpx;
+  margin-bottom: 20rpx; max-height: 420rpx; overflow-y: auto;
 }
-.scan-item { font-size: 26rpx; color: var(--text); padding: 6rpx 0; font-family: monospace; }
+.scan-item { padding: 14rpx 0; border-bottom: 1rpx solid var(--border); }
+.scan-item:last-child { border-bottom: none; }
+.scan-line { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.scan-isbn { font-size: 26rpx; color: var(--text); font-family: monospace; }
+.scan-state { flex-shrink: 0; font-size: 22rpx; color: var(--text-3); }
+.scan-title {
+  font-size: 24rpx; color: var(--text-2); line-height: 1.4; margin-top: 6rpx;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.scan-note { font-size: 22rpx; color: var(--text-3); margin-top: 6rpx; }
+
+.manual { display: flex; align-items: center; gap: 16rpx; margin-bottom: 20rpx; }
+.manual-input {
+  flex: 1; min-width: 0;
+  background: var(--bg); border-radius: 12rpx;
+  padding: 16rpx 22rpx; font-size: 26rpx;
+}
+.manual-btn {
+  flex-shrink: 0; font-size: 26rpx; color: var(--brand);
+  border: 1rpx solid var(--brand); border-radius: 12rpx; padding: 14rpx 28rpx;
+}
+
+.foot-tip { text-align: center; font-size: 22rpx; color: var(--text-3); padding: 8rpx 0 20rpx; }

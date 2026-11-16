@@ -58,11 +58,28 @@ Page({
   },
 
   onChat() {
-    app.ensureProfile().then(() => {
-      app.call('chat', { action: 'open', goodsId: this.id })
-        .then((conv) => wx.navigateTo({ url: '/pages/chat/chat?id=' + conv._id }))
-        .catch((err) => wx.showToast({ title: err.message, icon: 'none' }));
-    }).catch(() => {});
+    // 防连点：一次点击可能触发多次 open + navigateTo，导致叠出多个聊天页
+    if (this._chatting) return;
+    this._chatting = true;
+
+    wx.showLoading({ title: '打开中', mask: true });
+    const done = () => {
+      this._chatting = false;
+      wx.hideLoading();
+    };
+
+    app
+      .ensureProfile()
+      .then(() => app.call('chat', { action: 'open', goodsId: this.id }))
+      .then((conv) => {
+        done();
+        app.openChat(conv._id);
+      })
+      .catch((err) => {
+        done();
+        if (err && err.message === '请先完善资料') return; // ensureProfile 已跳转资料页
+        wx.showToast({ title: (err && (err.friendly || err.message)) || '打开失败', icon: 'none' });
+      });
   },
 
   onReport() {

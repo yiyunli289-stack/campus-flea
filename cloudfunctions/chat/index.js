@@ -1,6 +1,7 @@
 // 云函数：会话与消息
 // 对应需求：FR-P0-CHT-01 会话、FR-P0-NOT-01 通知（成交锁定后互见联系方式）
 const cloud = require('wx-server-sdk');
+const crypto = require('crypto');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
@@ -40,7 +41,17 @@ async function conversations(openid) {
       const u = await db.collection('users').where({ _openid: _.in(ids) }).get();
       u.data.forEach((x) => { users[x._openid] = x; });
     }
-    const list = res.data.map((c) => {
+    // 兼容历史重复会话：同一商品 + 同一买家只保留最近一条
+    const seen = Object.create(null);
+    const uniq = [];
+    res.data.forEach((c) => {
+      const key = c.goodsId + '|' + c.buyerId;
+      if (seen[key]) return;
+      seen[key] = true;
+      uniq.push(c);
+    });
+
+    const list = uniq.map((c) => {
       const isSeller = c.sellerId === openid;
       const other = users[isSeller ? c.buyerId : c.sellerId] || {};
       return { ...c, otherName: other.nickName || '匿名', otherAvatar: other.avatarUrl || '' };
@@ -68,13 +79,37 @@ async function resolveConv(params, openid) {
       buyerId = openid;
     }
 
-    const exist = await db.collection('conversations').where({ goodsId: g._id, sellerId: g.sellerId, buyerId }).get();
+    const exist = await db.collection('conversations')
+      .where({ goodsId: g._id, sellerId: g.sellerId, buyerId }).get();
     if (exist.data.length) return { code: 0, data: exist.data[0] };
 
     const now = Date.now();
-    const conv = { _openid: openid, goodsId: g._id, goodsTitle: g.title, goodsCover: (g.images && g.images[0]) || '', sellerId: g.sellerId, buyerId, lastMsg: '', lastTime: now, unreadSeller: 0, unreadBuyer: 0, updatedAt: now };
-    const addRes = await db.collection('conversations').add({ data: conv });
-    return { code: 0, data: { _id: addRes._id, ...conv } };
+    // 固定 _id：连点/并发调用也只会落一条会话
+    const convId = convDocId(g._id, buyerId);
+    const conv = {
+      _id: convId,
+      _openid: openid,
+      goodsId: g._id,
+      goodsTitle: g.title,
+      goodsCover: (g.images && g.images[0]) || '',
+      sellerId: g.sellerId,
+      buyerId,
+      lastMsg: '',
+      lastTime: now,
+      unreadSeller: 0,
+      unreadBuyer: 0,
+      updatedAt: now
+    };
+    try {
+      await db.collection('conversations').add({ data: conv });
+    } catch (e) {
+      // 并发时另一请求已按同一 _id 建好，回查复用
+      const again = await db.collection('conversations')
+        .where({ goodsId: g._id, sellerId: g.sellerId, buyerId }).get();
+      if (again.data.length) return { code: 0, data: again.data[0] };
+      throw e;
+    }
+    return { code: 0, data: conv };
   } catch (e) {
     console.error('resolveConv error:', e);
     return { code: -1, msg: '发起会话失败' };
@@ -109,6 +144,11 @@ async function messages(params, openid) {
     console.error('messages error:', e);
     return { code: -1, msg: '加载失败' };
   }
+}
+
+// 会话固定 _id：商品 + 买家 决定，保证幂等
+function convDocId(goodsId, buyerId) {
+  return 'c' + crypto.createHash('md5').update(goodsId + '_' + buyerId).digest('hex');
 }
 
 async function send(params, openid) {

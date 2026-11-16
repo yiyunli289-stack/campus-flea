@@ -26,7 +26,8 @@ Page({
     if (this.data.activeTab === 'book') params.cat = 'book';
     app.call('goods', params)
       .then((list) => this.setData({ goods: decorateGoods(list) }))
-      .catch(() => this.setData({ goods: [] }))
+      // 查询失败时保留已有列表，避免从详情返回后整页空白
+      .catch((err) => wx.showToast({ title: (err && (err.friendly || err.message)) || '加载失败', icon: 'none' }))
       .then(() => this.setData({ loading: false }));
   },
 

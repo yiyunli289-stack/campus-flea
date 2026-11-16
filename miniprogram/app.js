@@ -75,6 +75,20 @@ App({
     });
   },
 
+  // 打开聊天页：防连点 + 栈顶已是同一会话时不再重复压栈
+  openChat(convId) {
+    if (!convId) return;
+    const now = Date.now();
+    if (this._chatNavAt && now - this._chatNavAt < 800) return;
+    this._chatNavAt = now;
+
+    const pages = getCurrentPages();
+    const top = pages[pages.length - 1];
+    if (top && top.route === 'pages/chat/chat' && top.options && top.options.id === convId) return;
+
+    wx.navigateTo({ url: '/pages/chat/chat?id=' + convId, fail: () => {} });
+  },
+
   globalData: {
     userInfo: null,
     campus: '江安校区',

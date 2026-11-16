@@ -1,6 +1,7 @@
 // 云函数：报价/购买意向（创建、收到的、我发出的、卖家择一锁定、取消）
 // 对应需求：FR-P0-OFF-01 买家出价/购买意向、FR-P0-SEL-03 卖家择一 + 锁定状态机
 const cloud = require('wx-server-sdk');
+const crypto = require('crypto');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
@@ -119,15 +120,28 @@ async function accept(params, openid) {
       await db.collection('conversations').doc(cid).update({ data: { lastMsg: sysMsg, lastTime: now, updatedAt: now, unreadBuyer: _.inc(1) } });
       await db.collection('messages').add({ data: { _openid: openid, conversationId: cid, fromId: 'system', toId: o.buyerId, content: sysMsg, createdAt: now } });
     } else {
-      const conv = { _openid: openid, goodsId: o.goodsId, goodsTitle: o.goodsTitle, goodsCover: o.goodsCover, sellerId: openid, buyerId: o.buyerId, lastMsg: sysMsg, lastTime: now, unreadSeller: 0, unreadBuyer: 1, updatedAt: now };
-      const addRes = await db.collection('conversations').add({ data: conv });
-      await db.collection('messages').add({ data: { _openid: openid, conversationId: addRes._id, fromId: 'system', toId: o.buyerId, content: sysMsg, createdAt: now } });
+      // 与 chat 云函数使用同一固定 _id，避免并发建出两条会话
+      const convId = convDocId(o.goodsId, o.buyerId);
+      const conv = { _id: convId, _openid: openid, goodsId: o.goodsId, goodsTitle: o.goodsTitle, goodsCover: o.goodsCover, sellerId: openid, buyerId: o.buyerId, lastMsg: sysMsg, lastTime: now, unreadSeller: 0, unreadBuyer: 1, updatedAt: now };
+      try {
+        await db.collection('conversations').add({ data: conv });
+      } catch (e) {
+        await db.collection('conversations').doc(convId)
+          .update({ data: { lastMsg: sysMsg, lastTime: now, updatedAt: now, unreadBuyer: _.inc(1) } })
+          .catch(() => {});
+      }
+      await db.collection('messages').add({ data: { _openid: openid, conversationId: convId, fromId: 'system', toId: o.buyerId, content: sysMsg, createdAt: now } });
     }
     return { code: 0, data: { status: 'accepted' } };
   } catch (e) {
     console.error('offer.accept error:', e);
     return { code: -1, msg: '操作失败：' + e.message };
   }
+}
+
+// 与 chat 云函数保持一致：商品 + 买家 决定会话 _id
+function convDocId(goodsId, buyerId) {
+  return 'c' + crypto.createHash('md5').update(goodsId + '_' + buyerId).digest('hex');
 }
 
 async function cancel(params, openid) {

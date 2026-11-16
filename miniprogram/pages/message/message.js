@@ -26,6 +26,6 @@ Page({
       .catch(() => this.setData({ list: [] }));
   },
 
-  goChat(e) { wx.navigateTo({ url: '/pages/chat/chat?id=' + e.currentTarget.dataset.id }); },
+  goChat(e) { app.openChat(e.currentTarget.dataset.id); },
   goLogin() { wx.switchTab({ url: '/pages/mine/mine' }); }
 });

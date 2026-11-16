@@ -71,6 +71,7 @@ Page({
   },
 
   onPublish() {
+    if (this.data.publishing) return; // 防连点批量重复发布
     const list = this.data.list;
     if (!list.length) return wx.showToast({ title: '没有可发布的图书', icon: 'none' });
 

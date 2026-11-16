@@ -32,6 +32,7 @@
   border: 1rpx solid var(--brand); border-radius: 32rpx; padding: 8rpx 22rpx;
 }
 .i-btn.primary { background: var(--brand); color: #fff; }
+.i-btn.danger { color: var(--text-2); border-color: var(--border); }
 
 .empty { text-align: center; padding: 80rpx 0; }
 .empty-emoji { font-size: 96rpx; }

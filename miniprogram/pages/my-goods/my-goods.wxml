@@ -16,6 +16,7 @@
       <view class="i-btn" wx:if="{{item.status === 'on'}}" catchtap="onOffShelf" data-id="{{item._id}}">下架</view>
       <view class="i-btn primary" wx:if="{{item.status === 'locked'}}" catchtap="onComplete" data-id="{{item._id}}">确认成交</view>
       <view class="i-btn" wx:if="{{item.status === 'off'}}" catchtap="onRelist" data-id="{{item._id}}">重新上架</view>
+      <view class="i-btn danger" wx:if="{{item.status === 'off' || item.status === 'sold'}}" catchtap="onDelete" data-id="{{item._id}}">删除</view>
     </view>
   </view>
 

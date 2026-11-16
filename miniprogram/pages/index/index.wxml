@@ -57,7 +57,7 @@
   <!-- 空态 -->
   <view class="empty" wx:if="{{!goods.length && !loading}}">
     <view class="empty-emoji">🛍️</view>
-    <view class="empty-text">该校区还没有商品</view>
+    <view class="empty-text">{{campus === '全部校区' ? '还没有商品' : '该校区还没有商品'}}</view>
     <view class="empty-sub">去「发布」发第一件，或在「我的」页初始化演示数据</view>
   </view>
 

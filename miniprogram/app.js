@@ -22,6 +22,9 @@ App({
         if (!r || r.code !== 0) {
           const e = new Error((r && r.msg) || '操作失败');
           e.biz = true;
+          e.rawResult = r;
+          e.errCode = (r && r.errCode) || '';
+          e.errMsg = (r && r.errMsg) || '';
           throw e;
         }
         return r.data;

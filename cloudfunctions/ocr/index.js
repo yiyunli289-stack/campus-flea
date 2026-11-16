@@ -18,7 +18,51 @@ exports.main = async (event) => {
   if (action === 'ocrImage') return ocrImage(event);
   if (action === 'isbnLookup') return isbnLookup(event);
   if (action === 'isbnBatch') return isbnBatch(event);
+  if (action === 'diag') return diag();
   return { code: -1, msg: '未知操作' };
+}
+
+/* ============================== 自检 ============================== */
+
+// 返回云函数环境信息 + 一次真实的 OCR 云调用结果，用来定位「调用失败」的具体原因
+async function diag() {
+  let sdkVersion = '';
+  try {
+    sdkVersion = require('wx-server-sdk/package.json').version || '';
+  } catch (e) { /* ignore */ }
+
+  let config = null;
+  try {
+    config = JSON.parse(require('fs').readFileSync(__dirname + '/config.json', 'utf8'));
+  } catch (e) { /* ignore */ }
+
+  const out = {
+    sdkVersion,
+    hasOpenapi: !!(cloud.openapi && cloud.openapi.ocr && cloud.openapi.ocr.printedText),
+    config,
+    node: process.version
+  };
+
+  // 1x1 PNG，只用来验证「云调用是否被授权」；图片本身过小，OCR 可能返回空或格式错误
+  const png1x1 = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64'
+  );
+  try {
+    const r = await cloud.openapi.ocr.printedText({
+      type: 'photo',
+      img: { contentType: 'image/png', value: png1x1 }
+    });
+    out.ocrTest = { ok: true, items: ((r && r.items) || []).length };
+  } catch (e) {
+    out.ocrTest = {
+      ok: false,
+      errCode: (e && (e.errCode || e.code)) || '',
+      errMsg: (e && (e.errMsg || e.message)) || String(e)
+    };
+    console.error('diag ocr error:', e);
+  }
+  return { code: 0, data: out };
 };
 
 /* ============================ ISBN 书目查询 ============================ */
@@ -202,6 +246,14 @@ function to13(s) {
 
 /* ============================ 拍照 OCR 识别 ============================ */
 
+// 按文件头判断真实图片类型，避免把 png/webp 当成 jpeg 传给 OCR
+function sniffImageType(buf) {
+  if (buf[0] === 0xff && buf[1] === 0xd8) return 'image/jpeg';
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
+  if (buf.slice(0, 4).toString() === 'RIFF' && buf.slice(8, 12).toString() === 'WEBP') return 'image/webp';
+  return 'image/jpeg';
+}
+
 async function ocrImage(event) {
   const fileID = event.fileID;
   if (!fileID) return { code: -1, msg: '缺少图片' };
@@ -211,25 +263,51 @@ async function ocrImage(event) {
     const dl = await cloud.downloadFile({ fileID });
     buffer = dl.fileContent;
   } catch (e) {
-    return { code: -1, msg: '下载图片失败' };
+    return { code: -1, msg: '下载图片失败：' + ((e && (e.errMsg || e.message)) || '') };
+  }
+  if (!buffer || !buffer.length) return { code: -1, msg: '图片为空，请重新选择' };
+  if (buffer.length > 4 * 1024 * 1024) return { code: -1, msg: '图片过大（>4MB），请压缩后重试' };
+
+  if (!(cloud.openapi && cloud.openapi.ocr && cloud.openapi.ocr.printedText)) {
+    return {
+      code: -1,
+      msg: '当前 cloud 环境没有 openapi.ocr：请在云端重新安装依赖（wx-server-sdk ≥ 2.6.3）后重启云函数'
+    };
   }
 
   let res;
   try {
     res = await cloud.openapi.ocr.printedText({
       type: 'photo',
-      img: { contentType: 'image/jpeg', value: buffer }
+      img: { contentType: sniffImageType(buffer), value: buffer }
     });
   } catch (e) {
     console.error('openapi ocr error', e);
-    const raw = (e && (e.errMsg || e.message)) || '未知';
-    if (/permission|权限|-501000/i.test(raw)) {
+    const raw = (e && (e.errMsg || e.message)) || String(e);
+    const code = (e && (e.errCode || e.code)) || '';
+    const tag = (raw + ' ' + code).toLowerCase();
+
+    if (/48001|unauthor|scope|permission|权限|not authorized|未授权/.test(tag)) {
       return {
         code: -1,
-        msg: 'OCR 云调用未授权：确认 cloudfunctions/ocr/config.json 已声明 openapi 权限，并重新「上传并部署」'
+        msg:
+          'OCR 云调用未授权（' + (code || raw) + '）。先确认 cloudfunctions/ocr/config.json 已声明 ocr.printedText 权限，' +
+          '并右键 ocr → 上传并部署（云端安装依赖）；若仍报 48001，说明该小程序没有 OCR 接口权限（常见于个人主体/未认证账号），' +
+          '这种情况拍照识别不可用，请改用 ISBN 连续扫码。'
       };
     }
-    return { code: -1, msg: 'OCR 调用失败：' + raw + '（可改用连续扫码）' };
+    if (/45009|quota|limit|超出|频率|beyond/.test(tag)) {
+      return { code: -1, msg: 'OCR 免费额度已用完或调用过于频繁（' + (code || raw) + '），请稍后再试或改用连续扫码' };
+    }
+    if (/-501000|not found|ResourceNotFound/i.test(tag)) {
+      return { code: -1, msg: 'ocr 云函数不存在（-501000）：请确认已部署到当前环境 cloud1-d5gody0jj8418ae20' };
+    }
+    return {
+      code: -1,
+      msg: 'OCR 调用失败：' + raw + (code ? '（' + code + '）' : '') + '（可改用连续扫码）',
+      errCode: code,
+      errMsg: raw
+    };
   }
 
   const items = (res && res.items) || (res && res.result && res.result.items) || [];
@@ -250,8 +328,10 @@ function segment(items) {
   items.forEach((it) => {
     const text = (it.text || '').trim();
     if (!text) return;
+    // wx-server-sdk 会把返回结果的下划线字段转成驼峰：left_top → leftTop，两种都兼容
     const p = it.pos || {};
-    const pts = [p.left_top, p.right_top, p.right_bottom, p.left_bottom].filter(
+    const pick = (a, b) => p[a] || p[b];
+    const pts = [pick('leftTop', 'left_top'), pick('rightTop', 'right_top'), pick('rightBottom', 'right_bottom'), pick('leftBottom', 'left_bottom')].filter(
       (q) => q && typeof q.x === 'number'
     );
     if (pts.length === 4) {

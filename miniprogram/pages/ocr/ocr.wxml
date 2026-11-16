@@ -47,4 +47,5 @@
   </view>
 
   <view class="foot-tip">识别结果都会先进入确认页，逐本核对后才发布。</view>
+  <view class="diag" bindtap="onDiag">拍照识别用不了？点这里检测</view>
 </view>

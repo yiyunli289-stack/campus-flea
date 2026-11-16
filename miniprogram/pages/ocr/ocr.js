@@ -182,9 +182,57 @@ Page({
   showError(e) {
     if (e && e.friendly) {
       wx.showModal({ title: '云函数不可用', content: e.friendly, showCancel: false });
-    } else {
-      wx.showToast({ title: (e && (e.message || e.errMsg)) || '操作失败', icon: 'none' });
+      return;
     }
+    const msg = (e && (e.message || e.errMsg)) || '操作失败';
+    const code = (e && e.errCode) || '';
+    const text = String(msg).slice(0, 300) + (code ? '\n错误码：' + code : '');
+    wx.showModal({
+      title: '识别失败',
+      content: text,
+      confirmText: '复制',
+      cancelText: '知道了',
+      success: (r) => {
+        if (r.confirm) wx.setClipboardData({ data: text });
+      }
+    });
+  },
+
+  // 识别服务自检：看不到具体错误时先点这里
+  onDiag() {
+    wx.showLoading({ title: '检测中', mask: true });
+    app
+      .call('ocr', { action: 'diag' })
+      .then((d) => {
+        wx.hideLoading();
+        const perms =
+          (d.config && d.config.permissions && d.config.permissions.openapi) || [];
+        const lines = [
+          '云函数 SDK：' + (d.sdkVersion || '未知'),
+          'openapi.ocr：' + (d.hasOpenapi ? '存在' : '缺失'),
+          'config 权限：' + (perms.join(', ') || '无'),
+          'OCR 云调用：' + (d.ocrTest && d.ocrTest.ok ? '正常' : '失败')
+        ];
+        if (d.ocrTest && !d.ocrTest.ok) {
+          lines.push(
+            '错误：' + (d.ocrTest.errMsg || '未知') + (d.ocrTest.errCode ? '（' + d.ocrTest.errCode + '）' : '')
+          );
+        }
+        const text = lines.join('\n');
+        wx.showModal({
+          title: '识别服务检测',
+          content: text,
+          confirmText: '复制',
+          cancelText: '关闭',
+          success: (r) => {
+            if (r.confirm) wx.setClipboardData({ data: text });
+          }
+        });
+      })
+      .catch((e) => {
+        wx.hideLoading();
+        this.showError(e);
+      });
   },
 
   goReview(list, source) {

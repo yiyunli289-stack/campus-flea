@@ -27,6 +27,8 @@ Page({
       publisher: b.publisher || '',
       edition: b.edition || '',
       isbn: b.isbn || '',
+      cover: b.coverFileID || b.cover || '',
+      pubDate: b.pubDate || '',
       price: '',
       noteLevel: '',
       rawText: (b.raw || []).join(' / ')
@@ -69,6 +71,7 @@ Page({
   },
 
   onPublish() {
+    if (this.data.publishing) return; // 防连点批量重复发布
     const list = this.data.list;
     if (!list.length) return wx.showToast({ title: '没有可发布的图书', icon: 'none' });
 
@@ -98,7 +101,7 @@ Page({
             price: Number(it.price),
             condition,
             campus,
-            images: [],
+            images: it.cover ? [it.cover] : [],
             isbn: it.isbn,
             author: it.author,
             publisher: it.publisher,

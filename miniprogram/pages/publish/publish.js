@@ -96,6 +96,7 @@ Page({
   },
 
   onPublish() {
+    if (this.data.submitting) return; // 防连点重复发布
     const d = this.data;
     if (!d.title.trim()) return wx.showToast({ title: '请填写标题', icon: 'none' });
     const price = Number(d.price);

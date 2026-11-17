@@ -8,6 +8,7 @@
   <view class="section card">
     <view class="sec-title">📷 拍照识别（最多 3 张）</view>
     <view class="tip">拍摄技巧：把书<b>平放、书脊横向</b>对齐，文字清晰、避免反光和遮挡，识别率最高。</view>
+    <view class="tip warn">拍照识别依赖微信服务市场的 OCR 服务：需在小程序管理后台「服务市场」0 元订购「通用印刷体识别」，每天 100 次免费额度。没开通时会报 101003，改用下面的 ISBN 扫码即可。</view>
     <view class="img-list">
       <view class="img-item" wx:for="{{images}}" wx:key="*this">
         <image class="img" src="{{item}}" mode="aspectFill" />
@@ -21,10 +22,31 @@
   <!-- 扫码 -->
   <view class="section card">
     <view class="sec-title">🔖 ISBN 连续扫码</view>
-    <view class="tip">教材背面都有条码，扫到的 ISBN 100% 准确，逐本扫即可批量加。</view>
+    <view class="tip">教材背面都有条码。扫到 ISBN 会<text class="hl">自动查书名、作者、出版社和封面</text>，逐本扫即可批量加。</view>
     <view class="scan-list" wx:if="{{scanList.length}}">
-      <view class="scan-item" wx:for="{{scanList}}" wx:key="isbn">{{index + 1}}. {{item.isbn}}</view>
+      <view class="scan-item" wx:for="{{scanList}}" wx:key="key">
+        <view class="scan-line">
+          <text class="scan-isbn">{{index + 1}}. {{item.isbn}}</text>
+          <text class="scan-state" wx:if="{{item.loading}}">查询中…</text>
+        </view>
+        <view class="scan-title" wx:if="{{item.title}}">{{item.title}}</view>
+        <view class="scan-note" wx:elif="{{!item.loading}}">{{item.note || '未收录，可稍后手填书名'}}</view>
+      </view>
+    </view>
+    <view class="manual">
+      <input
+        class="manual-input"
+        placeholder="也可手动输入 10/13 位 ISBN"
+        value="{{manualIsbn}}"
+        bindinput="onManualInput"
+        confirm-type="search"
+        bindconfirm="manualLookup"
+      />
+      <view class="manual-btn" bindtap="manualLookup">查询</view>
     </view>
     <view class="btn-brand recog-btn" bindtap="scanIsbn">开始扫码</view>
   </view>
+
+  <view class="foot-tip">识别结果都会先进入确认页，逐本核对后才发布。</view>
+  <view class="diag" bindtap="onDiag">拍照识别用不了？点这里检测</view>
 </view>

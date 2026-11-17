@@ -13,13 +13,40 @@ App({
     this.globalData.userInfo = wx.getStorageSync('userInfo') || null;
   },
 
-  // 统一云函数调用封装：code!==0 抛错
+  // 统一云函数调用封装：code!==0 抛错；未部署/调用失败给出可执行的提示
   call(name, data) {
-    return wx.cloud.callFunction({ name, data }).then((res) => {
-      const r = res.result;
-      if (r.code !== 0) throw new Error(r.msg || '操作失败');
-      return r.data;
-    });
+    return wx.cloud
+      .callFunction({ name, data })
+      .then((res) => {
+        const r = res && res.result;
+        if (!r || r.code !== 0) {
+          const e = new Error((r && r.msg) || '操作失败');
+          e.biz = true;
+          e.rawResult = r;
+          e.errCode = (r && r.errCode) || '';
+          e.errMsg = (r && r.errMsg) || '';
+          throw e;
+        }
+        return r.data;
+      })
+      .catch((err) => {
+        if (err && err.biz) throw err;
+        const raw = (err && (err.errMsg || err.message)) || '云函数调用失败';
+        const e = new Error(raw);
+        e.functionName = name;
+        const m = raw.match(/-5\d{5}|-4\d{5}/);
+        e.errCode = (err && err.errCode) || (m ? m[0] : '');
+        // -501000 云函数不存在 / -504002 依赖未安装 / -404011 调用失败
+        if (/-501000|-504002|-404011/.test(raw)) {
+          e.friendly =
+            '云函数「' +
+            name +
+            '」不可用。请在微信开发者工具中右键 cloudfunctions/' +
+            name +
+            ' → 上传并部署（云端安装依赖），然后重新打开小程序再试。';
+        }
+        throw e;
+      });
   },
 
   login() {
@@ -49,6 +76,20 @@ App({
       }
       return user;
     });
+  },
+
+  // 打开聊天页：防连点 + 栈顶已是同一会话时不再重复压栈
+  openChat(convId) {
+    if (!convId) return;
+    const now = Date.now();
+    if (this._chatNavAt && now - this._chatNavAt < 800) return;
+    this._chatNavAt = now;
+
+    const pages = getCurrentPages();
+    const top = pages[pages.length - 1];
+    if (top && top.route === 'pages/chat/chat' && top.options && top.options.id === convId) return;
+
+    wx.navigateTo({ url: '/pages/chat/chat?id=' + convId, fail: () => {} });
   },
 
   globalData: {

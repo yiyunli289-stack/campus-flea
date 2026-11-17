@@ -18,6 +18,7 @@ exports.main = async (event) => {
     case 'offShelf': return setStatus(params, OPENID, 'off');
     case 'relist': return setStatus(params, OPENID, 'on');
     case 'complete': return complete(params, OPENID);
+    case 'remove': return removeGoods(params, OPENID);
     case 'seed': return seed();
     default: return { code: -1, msg: '未知操作' };
   }
@@ -137,6 +138,20 @@ async function setStatus(params, openid, status) {
   }
 }
 
+// 删除自己发布的商品（锁定中的交易不允许删）
+async function removeGoods(params, openid) {
+  try {
+    const res = await db.collection('goods').doc(params.id).get();
+    const g = res.data;
+    if (!g || g.sellerId !== openid) return { code: -1, msg: '无权操作' };
+    if (g.status === 'locked') return { code: -1, msg: '交易锁定中，不能删除' };
+    await db.collection('goods').doc(params.id).remove();
+    return { code: 0, data: { removed: true } };
+  } catch (e) {
+    return { code: -1, msg: '删除失败' };
+  }
+}
+
 async function complete(params, openid) {
   try {
     const res = await db.collection('goods').doc(params.id).get();
@@ -151,7 +166,27 @@ async function complete(params, openid) {
 }
 
 // 演示数据：方便测试版一键填充（sellerId 固定为 demo-seller，不会混入真实用户）
+// 幂等：每次先清空旧的演示商品，重复点击不会出现多份相同商品
 async function seed() {
+  let removed = 0;
+  try {
+    while (true) {
+      const old = await db.collection('goods').where({ sellerId: 'demo-seller' }).limit(100).get();
+      if (!old.data.length) break;
+      let roundRemoved = 0;
+      for (const d of old.data) {
+        try {
+          await db.collection('goods').doc(d._id).remove();
+          removed++;
+          roundRemoved++;
+        } catch (e) { /* 忽略单条删除失败 */ }
+      }
+      if (roundRemoved === 0) break; // 全部删不掉时避免死循环
+    }
+  } catch (e) {
+    console.error('seed cleanup error:', e);
+  }
+
   const now = Date.now();
   const items = [
     { sellerName: '阿柠', sellerCollege: '计算机学院（软件学院）', cat: 'digital', tradeType: '定价', allowBargain: true, title: '九成新苹果 iPad 第9代 64G', desc: '自用 iPad 第9代 64G Wi-Fi 版，无磕碰无维修，配原装充电器，可当面验机。', price: 1299, condition: '几乎全新', campus: '江安校区', images: [] },
@@ -162,9 +197,24 @@ async function seed() {
     { sellerName: '小赵', sellerCollege: '计算机学院（软件学院）', cat: 'book', tradeType: '竞价', allowBargain: true, title: '数据结构（C语言版）', desc: '数据结构教材，笔记较多但对复习有帮助，价格可议。', price: 18, condition: '轻微使用', campus: '江安校区', images: [], isbn: '9787302251446', author: '严蔚敏', publisher: '清华大学出版社', edition: '第二版', college: '计算机学院（软件学院）', course: '数据结构', noteLevel: '较多', noteDesc: '多个章节有划线批注和答案填写', defects: '封面边角有折痕', innerPhotos: [] }
   ];
 
-  for (const it of items) {
-    const g = { _openid: 'demo-seller', sellerId: 'demo-seller', status: 'on', buyerId: '', dealPrice: null, viewCount: 0, createdAt: now, updatedAt: now, ...it };
-    await db.collection('goods').add({ data: g });
+  for (let i = 0; i < items.length; i++) {
+    const g = {
+      _id: 'seed-' + (i + 1),
+      _openid: 'demo-seller',
+      sellerId: 'demo-seller',
+      status: 'on',
+      buyerId: '',
+      dealPrice: null,
+      viewCount: 0,
+      createdAt: now,
+      updatedAt: now,
+      ...items[i]
+    };
+    try {
+      await db.collection('goods').add({ data: g });
+    } catch (e) {
+      console.error('seed add error:', e && e.message);
+    }
   }
-  return { code: 0, data: { count: items.length } };
+  return { code: 0, data: { count: items.length, removed } };
 }

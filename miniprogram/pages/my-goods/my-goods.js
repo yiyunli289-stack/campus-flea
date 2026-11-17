@@ -36,6 +36,20 @@ Page({
       .catch((err) => wx.showToast({ title: err.message, icon: 'none' }));
   },
 
+  onDelete(e) {
+    wx.showModal({
+      title: '删除这件商品？',
+      content: '删除后不可恢复，重复发布的多余商品可以这样清理',
+      confirmColor: '#B4100A',
+      success: (r) => {
+        if (!r.confirm) return;
+        app.call('goods', { action: 'remove', id: e.currentTarget.dataset.id })
+          .then(() => this.load())
+          .catch((err) => wx.showToast({ title: err.message, icon: 'none' }));
+      }
+    });
+  },
+
   onComplete(e) {
     wx.showModal({
       title: '确认成交？',

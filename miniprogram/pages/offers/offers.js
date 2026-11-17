@@ -53,7 +53,7 @@ Page({
 
   onChat(e) {
     app.call('chat', { action: 'open', goodsId: e.currentTarget.dataset.goodsId })
-      .then((conv) => wx.navigateTo({ url: '/pages/chat/chat?id=' + conv._id }))
+      .then((conv) => app.openChat(conv._id))
       .catch((err) => wx.showToast({ title: err.message, icon: 'none' }));
   }
 });

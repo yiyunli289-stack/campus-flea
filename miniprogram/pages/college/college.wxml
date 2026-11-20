@@ -1,5 +1,6 @@
 <view class="page">
-  <view class="intro">按学科门类浏览川大各学院书单</view>
+  <block wx:if="{{!college}}">
+  <view class="intro">按学科门类浏览各学院书单</view>
 
   <view class="group" wx:for="{{groups}}" wx:key="group">
     <view class="group-title">{{item.group}}</view>
@@ -10,4 +11,30 @@
       </view>
     </view>
   </view>
+  </block>
+  <block wx:else>
+    <view class="group-title" bindtap="backToColleges">‹ {{college}}</view>
+    <view class="college-item">
+      <input placeholder="搜索书名、课程或 ISBN" value="{{keyword}}" bindinput="onKeyword" bindconfirm="refresh" />
+      <text bindtap="refresh">搜索</text>
+    </view>
+    <view class="book-filters">
+      <picker wx:for="{{filters}}" wx:key="key" range="{{item.values}}" value="{{item.index}}" data-key="{{item.key}}" bindchange="onFilter">
+        <view>{{item.label}} {{item.values[item.index]}} ▾</view>
+      </picker>
+    </view>
+    <view class="intro" wx:if="{{error}}">{{error}}</view>
+    <view class="intro" wx:elif="{{busy && !rows.length}}">正在加载书单…</view>
+    <view class="intro" wx:elif="{{!rows.length}}">暂无匹配的书单条目</view>
+    <view class="card book-row" wx:for="{{rows}}" wx:key="_id">
+      <view class="ci-name">{{item.title}} <text wx:if="{{item.edition}}">· {{item.edition}}</text></view>
+      <view class="intro">{{item.term}} · {{item.course}} · {{item.materialType}}</view>
+      <view class="book-actions">
+        <text data-id="{{item._id}}" bindtap="searchBook">查看在售</text>
+        <text data-id="{{item._id}}" bindtap="feedback">提交纠错</text>
+      </view>
+    </view>
+    <button size="mini" wx:if="{{rows.length < total}}" bindtap="more" loading="{{busy}}">加载更多</button>
+    <button size="mini" bindtap="searchCollege">查看该学院在售图书</button>
+  </block>
 </view>

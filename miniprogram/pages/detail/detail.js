@@ -1,7 +1,7 @@
 const app = getApp();
 const { decorateGoods, fmtTime } = require('../../utils/format');
 
-Page({
+require('../../utils/page')({
   data: {
     goods: null,
     isBook: false,
@@ -65,24 +65,7 @@ Page({
     }).catch(() => {});
   },
 
-  onReport() {
-    const reasons = ['虚假信息', '违禁物品', '涉嫌诈骗', '其他'];
-    wx.showActionSheet({
-      itemList: reasons,
-      success: (res) => {
-        const reason = reasons[res.tapIndex];
-        wx.showModal({
-          title: '举报 · ' + reason,
-          editable: true,
-          placeholderText: '补充说明（选填）',
-          success: (r) => {
-            if (!r.confirm) return;
-            app.call('report', { action: 'create', goodsId: this.id, reason, detail: r.content || '' })
-              .then(() => wx.showToast({ title: '已提交举报', icon: 'success' }))
-              .catch((err) => wx.showToast({ title: err.message, icon: 'none' }));
-          }
-        });
-      }
-    });
-  }
+  onReportSeller() { require('../../utils/governance').report('users', this.data.goods.sellerId); },
+  onBlockSeller() { require('../../utils/governance').block(this.data.goods.sellerId); },
+  onReport() { require('../../utils/governance').report('goods', this.id); }
 });

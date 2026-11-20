@@ -1,3 +1,4 @@
+<safety-tip />
 <view class="page">
   <!-- 批量录入入口 -->
   <view class="batch-entry card" bindtap="goOcr">
@@ -54,7 +55,7 @@
     </view>
     <view class="field">
       <text class="label">价格（元）</text>
-      <input class="input" type="digit" placeholder="{{tradeType === '竞价' ? '起拍价' : '一口价'}}" value="{{price}}" data-field="price" bindinput="onInput" />
+      <input class="input" type="digit" placeholder="{{tradeType === '竞价' ? '期望价（可不填）' : '一口价'}}" value="{{price}}" data-field="price" bindinput="onInput" />
     </view>
     <view class="field">
       <text class="label">成色</text>
@@ -74,6 +75,7 @@
     </view>
   </view>
 
+  <view class="section card" wx:if="{{activeFields.length}}"><view class="sec-title">类目专属信息</view><view class="field" wx:for="{{activeFields}}" wx:key="code"><text class="label">{{item.name}}{{item.required ? ' *' : ''}}</text><picker wx:if="{{item.type === 'enum'}}" range="{{item.options}}" data-i="{{index}}" bindchange="onAttributeEnum"><view class="picker-val">{{attributes[item.code] || '请选择'}} ›</view></picker><input wx:else class="input" type="{{item.type === 'number' ? 'digit' : 'text'}}" value="{{attributes[item.code]}}" data-field="{{item.code}}" bindinput="onAttribute" /></view></view>
   <!-- 图书专属 -->
   <view class="section card" wx:if="{{cat === 'book'}}">
     <view class="sec-title">📖 图书专属信息</view>

@@ -8,14 +8,14 @@
       <view class="i-main">
         <view class="i-title">{{item.title}}</view>
         <view class="i-meta">¥{{item.priceText}} · {{item.timeText}}</view>
-        <view class="i-status s-{{item.status}}">{{statusText[item.status]}}</view>
+        <view class="i-status s-{{item.status}}">{{item.displayState}}</view>
       </view>
     </view>
-    <view class="i-actions">
+    <view class="i-actions"><view class="i-btn" wx:if="{{item.enforcement === 'removed'}}" catchtap="onAppeal" data-id="{{item._id}}">申请复核</view>
       <view class="i-btn" wx:if="{{item.status === 'on'}}" catchtap="onOffers" data-id="{{item._id}}">查看报价</view>
       <view class="i-btn" wx:if="{{item.status === 'on'}}" catchtap="onOffShelf" data-id="{{item._id}}">下架</view>
       <view class="i-btn primary" wx:if="{{item.status === 'locked'}}" catchtap="onComplete" data-id="{{item._id}}">确认成交</view>
-      <view class="i-btn" wx:if="{{item.status === 'off'}}" catchtap="onRelist" data-id="{{item._id}}">重新上架</view>
+      <view class="i-btn" wx:if="{{item.status === 'off' && item.enforcement !== 'removed' && item.moderationStatus === 'approved'}}" catchtap="onRelist" data-id="{{item._id}}">重新上架</view>
     </view>
   </view>
 

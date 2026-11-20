@@ -1,3 +1,4 @@
+<safety-tip />
 <view class="page">
   <view class="chat-head">
     <text class="chat-name">{{other.nickName || '聊天'}}</text>
@@ -9,13 +10,14 @@
       <view wx:for="{{messages}}" wx:key="_id" id="m{{index}}">
         <view class="sys" wx:if="{{item.sys}}">{{item.content}}</view>
         <view class="bubble-row {{item.mine ? 'mine' : ''}}" wx:else>
-          <view class="bubble">{{item.content}}</view>
+          <view class="bubble" bindlongpress="onReportMessage" data-id="{{item._id}}">{{item.content}}</view>
         </view>
       </view>
     </view>
   </scroll-view>
 
-  <view class="input-bar">
+  <view wx:if="{{!canSend}}">当前会话只读；长按消息可举报</view>
+  <view class="input-bar" wx:if="{{canSend}}">
     <input class="ib-input" placeholder="输入消息…" value="{{input}}" bindinput="onInput" confirm-type="send" bindconfirm="send" />
     <view class="ib-send" bindtap="send">发送</view>
   </view>

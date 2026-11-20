@@ -1,7 +1,7 @@
 const app = getApp();
 const { ALL_COLLEGES } = require('../../utils/colleges');
 
-Page({
+require('../../utils/page')({
   data: {
     nickName: '',
     avatarUrl: '',
@@ -53,10 +53,10 @@ Page({
     if (!contact.trim()) return wx.showToast({ title: '请填写联系方式', icon: 'none' });
 
     wx.showLoading({ title: '保存中' });
-    app.updateProfile({ nickName: nickName.trim(), avatarUrl, campus, college, major: major.trim(), contact: contact.trim() })
+    Promise.resolve(avatarUrl && !avatarUrl.startsWith('cloud://') ? app.uploadFile(avatarUrl).then(r => r.fileID) : avatarUrl).then(savedAvatar => app.updateProfile({ nickName: nickName.trim(), avatarUrl: savedAvatar, campus, college, major: major.trim(), contact: contact.trim() }))
       .then(() => {
         wx.hideLoading();
-        wx.showToast({ title: '保存成功', icon: 'success' });
+        wx.showToast({ title: '资料已提交审核', icon: 'success' });
         setTimeout(() => wx.navigateBack(), 600);
       })
       .catch((err) => {

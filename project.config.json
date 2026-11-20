@@ -4,7 +4,7 @@
   "compileType": "miniprogram",
   "appid": "wxf6e40ce77fd88517",
   "projectname": "campus-flea",
-  "libVersion": "3.3.4",
+  "libVersion": "3.18.0",
   "setting": {
     "es6": true,
     "enhance": true,

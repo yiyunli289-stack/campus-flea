@@ -1,9 +1,17 @@
 {
-  "name": "report",
+  "name": "campus-report",
   "version": "1.0.0",
-  "description": "",
+  "private": true,
   "main": "index.js",
   "dependencies": {
-    "wx-server-sdk": "~2.6.3"
+    "wx-server-sdk": "^4.0.2",
+    "@cloudbase/node-sdk": "^4.2.1",
+    "fast-xml-parser": "^5.3.0"
+  },
+  "overrides": {
+    "wx-server-sdk": {
+      "@cloudbase/node-sdk": "$@cloudbase/node-sdk"
+    },
+    "axios": "^1.21.1"
   }
 }

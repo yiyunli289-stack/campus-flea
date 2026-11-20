@@ -3,9 +3,10 @@ const { CATEGORY_MAP, CONDITIONS, TRADE_TYPES, CAMPUS_LIST } = require('../../ut
 const { ALL_COLLEGES } = require('../../utils/colleges');
 const { decorateGoods } = require('../../utils/format');
 
-Page({
+require('../../utils/page')({
   data: {
     keyword: '',
+    isbn: '', edition: '',
     cats: [],
     cat: '',
     campusOptions: ['全部校区'].concat(CAMPUS_LIST),
@@ -35,19 +36,25 @@ Page({
   },
 
   applyPreset() {
+    const book=wx.getStorageSync('searchBook');
+    if (book && typeof book==='object') {
+      this.setData({ keyword:book.keyword || '', isbn:book.isbn || '', edition:book.edition || '',
+        cat:'book', campusIndex:0, collegeIndex:0, condIndex:0, tradeIndex:0, priceMin:'', priceMax:'' });
+      wx.removeStorageSync('searchBook');
+    }
     const cat = wx.getStorageSync('searchCat');
     if (cat) { this.setData({ cat }); wx.removeStorageSync('searchCat'); }
 
     const college = wx.getStorageSync('searchCollege');
     if (college) {
       const idx = ALL_COLLEGES.indexOf(college);
-      this.setData({ cat: 'book', collegeIndex: Math.max(0, idx) + 1 });
+      this.setData({ cat: 'book', collegeIndex: idx + 1 });
       wx.removeStorageSync('searchCollege');
     }
   },
 
-  onKeyword(e) { this.setData({ keyword: e.detail.value }); },
-  onCat(e) { this.setData({ cat: e.currentTarget.dataset.key }); },
+  onKeyword(e) { this.setData({ keyword: e.detail.value, isbn:'', edition:'' }); },
+  onCat(e) { this.setData({ cat: e.currentTarget.dataset.key, isbn:'', edition:'' }); },
   onCampus(e) { this.setData({ campusIndex: Number(e.detail.value) }); },
   onCollege(e) { this.setData({ collegeIndex: Number(e.detail.value) }); },
   onCond(e) { this.setData({ condIndex: Number(e.detail.value) }); },
@@ -59,7 +66,7 @@ Page({
 
   reset() {
     this.setData({
-      keyword: '', cat: '', campusIndex: 0, collegeIndex: 0,
+      keyword: '', isbn: '', edition: '', cat: '', campusIndex: 0, collegeIndex: 0,
       condIndex: 0, tradeIndex: 0, priceMin: '', priceMax: ''
     }, () => this.search());
   },
@@ -77,6 +84,8 @@ Page({
     };
     if (priceMin) params.priceMin = Number(priceMin);
     if (priceMax) params.priceMax = Number(priceMax);
+    if (this.data.isbn) { params.isbn=this.data.isbn; params.keyword=''; }
+    if (this.data.edition && !this.data.isbn) params.edition=this.data.edition;
 
     this.setData({ loading: true, searched: true });
     app.call('goods', params)

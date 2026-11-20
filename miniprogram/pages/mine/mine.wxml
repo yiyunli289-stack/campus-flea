@@ -33,11 +33,6 @@
 
   <!-- 次要列表 -->
   <view class="sec-list card">
-    <view class="sec-item" bindtap="onSeed">
-      <text class="sec-icon">🧪</text>
-      <text class="sec-text">初始化演示数据</text>
-      <text class="sec-arrow">›</text>
-    </view>
     <view class="sec-item" bindtap="onAbout">
       <text class="sec-icon">ℹ️</text>
       <text class="sec-text">关于本程序</text>

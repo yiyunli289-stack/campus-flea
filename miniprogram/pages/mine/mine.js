@@ -1,9 +1,10 @@
 const app = getApp();
 
-Page({
+require('../../utils/page')({
   data: {
     userInfo: null,
     menu: [
+      { icon: '🛡️', text: '安全中心与通知', url: '/pages/safety/safety' },
       { icon: '📦', text: '我的发布', url: '/pages/my-goods/my-goods' },
       { icon: '💰', text: '我的报价', url: '/pages/offers/offers' },
       { icon: '⭐', text: '我的收藏', url: '' },

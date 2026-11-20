@@ -2,7 +2,7 @@ const app = getApp();
 const { CATEGORY_MAP, CONDITIONS, NOTE_LEVELS, CAMPUS_LIST } = require('../../utils/constants');
 const { ALL_COLLEGES } = require('../../utils/colleges');
 
-Page({
+require('../../utils/page')({
   data: {
     cats: [],
     cat: 'book',
@@ -25,6 +25,7 @@ Page({
     images: [],
     innerPhotos: [],
     isbn: '', author: '', publisher: '', edition: '', course: '', noteDesc: '', defects: '',
+    attributes: {}, activeFields: [],
     submitting: false
   },
 
@@ -38,11 +39,14 @@ Page({
 
     const draft = wx.getStorageSync('goodsDraft');
     if (draft) this.setData(draft);
+    this.setData({ activeFields: ((app.globalData.config || {}).categories || []).find(c => c.code === this.data.cat)?.fields || [] });
   },
 
   goOcr() { wx.navigateTo({ url: '/pages/ocr/ocr' }); },
 
-  onCat(e) { this.setData({ cat: e.currentTarget.dataset.key }); },
+  onCat(e) { const cat = e.currentTarget.dataset.key; this.setData({ cat, attributes: {}, activeFields: (app.globalData.config.categories.find(c => c.code === cat) || {}).fields || [] }); },
+  onAttribute(e) { this.setData({ ['attributes.' + e.currentTarget.dataset.field]: e.detail.value }); },
+  onAttributeEnum(e) { const f = this.data.activeFields[Number(e.currentTarget.dataset.i)]; this.setData({ ['attributes.' + f.code]: f.options[Number(e.detail.value)] }); },
   onTrade(e) { this.setData({ tradeType: e.currentTarget.dataset.key }); },
   onBargain(e) { this.setData({ allowBargain: e.detail.value }); },
   onInput(e) { this.setData({ [e.currentTarget.dataset.field]: e.detail.value }); },
@@ -85,21 +89,15 @@ Page({
     wx.showToast({ title: '草稿已保存', icon: 'success' });
   },
 
-  uploadFiles(paths, prefix) {
-    if (!paths.length) return Promise.resolve([]);
-    const openid = (app.globalData.userInfo && app.globalData.userInfo._openid) || 'u';
-    const tasks = paths.map((p, i) => wx.cloud.uploadFile({
-      cloudPath: prefix + '/' + openid + '/' + Date.now() + '-' + i + '.jpg',
-      filePath: p
-    }));
-    return Promise.all(tasks).then((res) => res.map((r) => r.fileID));
-  },
+  uploadFiles(paths) { return Promise.all(paths.map(p => app.uploadFile(p))).then(rows => rows.map(r => r.fileID)); },
 
   onPublish() {
     const d = this.data;
     if (!d.title.trim()) return wx.showToast({ title: '请填写标题', icon: 'none' });
     const price = Number(d.price);
-    if (!price || price <= 0) return wx.showToast({ title: '请填写有效价格', icon: 'none' });
+    if (d.tradeType === '定价' && (!price || price <= 0 || price > 9999)) return wx.showToast({ title: '请填写0.01至9999元的价格', icon: 'none' });
+    if (!d.images.length) return wx.showToast({ title: '请上传至少1张实物图', icon: 'none' });
+    if (d.cat === 'book' && d.noteLevel !== '无笔记' && !d.innerPhotos.length) return wx.showToast({ title: '有笔记须上传内页图', icon: 'none' });
 
     app.ensureProfile().then(() => {
       this.setData({ submitting: true });
@@ -109,7 +107,7 @@ Page({
         this.uploadFiles(d.innerPhotos, 'goods-inner')
       ]).then(([images, innerPhotos]) => {
         return app.call('goods', {
-          action: 'publish',
+          action: 'publish', configVersion: app.globalData.config.version, attributes: d.attributes,
           cat: d.cat,
           tradeType: d.tradeType,
           allowBargain: d.allowBargain,
@@ -128,7 +126,7 @@ Page({
       }).then(() => {
         wx.hideLoading();
         wx.removeStorageSync('goodsDraft');
-        wx.showToast({ title: '发布成功', icon: 'success' });
+        wx.showToast({ title: '已提交审核', icon: 'success' });
         setTimeout(() => wx.switchTab({ url: '/pages/index/index' }), 800);
       }).catch((err) => {
         wx.hideLoading();

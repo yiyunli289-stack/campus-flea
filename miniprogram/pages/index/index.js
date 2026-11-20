@@ -2,7 +2,7 @@ const app = getApp();
 const { HOT_COLLEGES } = require('../../utils/colleges');
 const { decorateGoods } = require('../../utils/format');
 
-Page({
+require('../../utils/page')({
   data: {
     campus: '江安校区',
     hotColleges: HOT_COLLEGES,

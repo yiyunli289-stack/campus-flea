@@ -8,7 +8,7 @@ exports.main = async (event) => {
   const { action } = event || {};
   const { OPENID } = cloud.getWXContext();
   if (!OPENID) return { code: -1, msg: '未登录' };
-  if (action === 'ocrImage') return ocrImage(event);
+  if (action === 'ocrImage') { const { service } = require('./lib/runtime').createRuntime(); try { await service.user(OPENID, 'publish'); await require('./lib/moderation').validateFiles(service, OPENID, [event.fileID]); return ocrImage(event); } catch (e) { return { code: e.code || -1, msg: e.message }; } }
   return { code: -1, msg: '未知操作' };
 };
 

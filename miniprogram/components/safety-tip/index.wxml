@@ -1,0 +1,1 @@
+<view class="safety-tip"><text>交易安全</text>{{tip}}</view>

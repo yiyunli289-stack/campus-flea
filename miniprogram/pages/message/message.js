@@ -1,7 +1,7 @@
 const app = getApp();
 const { fmtTime } = require('../../utils/format');
 
-Page({
+require('../../utils/page')({
   data: { list: [], loggedIn: false },
 
   onShow() {

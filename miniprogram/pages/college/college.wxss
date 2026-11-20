@@ -28,3 +28,7 @@
 .college-item:last-child { border-bottom: none; }
 .ci-name { font-size: 30rpx; color: var(--text); }
 .ci-arrow { color: var(--text-3); font-size: 32rpx; }
+.book-row { margin: 20rpx 0; padding: 22rpx; }
+.book-filters, .book-actions { display: flex; flex-wrap: wrap; gap: 16rpx 24rpx; }
+.book-filters { padding: 16rpx 8rpx; font-size: 24rpx; }
+.book-actions { font-size: 26rpx; color: var(--brand); }

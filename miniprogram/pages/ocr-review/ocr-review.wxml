@@ -1,3 +1,4 @@
+<safety-tip />
 <view class="page">
   <view class="head-tip">
     共 {{list.length}} 本待确认。书名、笔记等级、价格逐本必填；校区/成色/学院可批量设置。
@@ -70,6 +71,7 @@
       </view>
     </view>
 
+    <view class="field"><text class="label">实物照片（必填）</text><view bindtap="chooseBookImages" data-i="{{bi}}" data-kind="images">选择 / 替换 {{item.images.length}} 张</view></view><view class="field"><text class="label">内页照片（有笔记必填）</text><view bindtap="chooseBookImages" data-i="{{bi}}" data-kind="innerPhotos">选择 / 替换 {{item.innerPhotos.length}} 张</view></view>
     <view class="raw" wx:if="{{item.rawText}}">识别原文：{{item.rawText}}</view>
   </view>
 

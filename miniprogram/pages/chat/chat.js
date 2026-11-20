@@ -1,8 +1,8 @@
 const app = getApp();
 const { fmtTime } = require('../../utils/format');
 
-Page({
-  data: { messages: [], other: {}, input: '', lastId: '' },
+require('../../utils/page')({
+  data: { messages: [], other: {}, input: '', lastId: '', canSend: false, state: '' },
 
   onLoad(query) { this.id = query.id; },
   onShow() { this.load(); },
@@ -17,11 +17,12 @@ Page({
           mine: m.fromId === me,
           sys: m.fromId === 'system'
         }));
-        this.setData({ messages, other: res.other, lastId: 'm' + (messages.length - 1) });
+        this.setData({ messages, other: res.other, canSend: res.canSend, state: res.state, lastId: 'm' + (messages.length - 1) });
       })
       .catch((err) => wx.showToast({ title: err.message, icon: 'none' }));
   },
 
+  onReportMessage(e) { require('../../utils/governance').report('messages', e.currentTarget.dataset.id); },
   onInput(e) { this.setData({ input: e.detail.value }); },
 
   send() {

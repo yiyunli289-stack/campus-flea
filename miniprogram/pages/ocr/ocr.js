@@ -1,6 +1,6 @@
 const app = getApp();
 
-Page({
+require('../../utils/page')({
   data: {
     images: [],
     scanList: [],
@@ -66,10 +66,7 @@ Page({
       let all = [];
       try {
         for (let i = 0; i < this.data.images.length; i++) {
-          const up = await wx.cloud.uploadFile({
-            cloudPath: 'ocr/' + openid + '/' + Date.now() + '-' + i + '.jpg',
-            filePath: this.data.images[i]
-          });
+          const up = await app.uploadFile(this.data.images[i]);
           const r = await app.call('ocr', { action: 'ocrImage', fileID: up.fileID });
           all = all.concat(r.books || []);
         }

@@ -1,0 +1,30 @@
+{
+  "note": "在目标环境控制台创建/核对；索引名称为建议值。单字段 _id 索引由平台提供。不要给 auditLogs 配置三年内删除的TTL。",
+  "indexes": [
+    {"collection":"users","fields":{"_openid":1}},
+    {"collection":"goods","fields":{"status":1,"moderationStatus":1,"enforcement":1,"createdAt":-1}},
+    {"collection":"goods","fields":{"sellerId":1,"createdAt":-1}},
+    {"collection":"offers","fields":{"goodsId":1,"status":1,"createdAt":1}},
+    {"collection":"offers","fields":{"buyerId":1,"createdAt":-1}},
+    {"collection":"offers","fields":{"sellerId":1,"createdAt":-1}},
+    {"collection":"conversations","fields":{"goodsId":1,"sellerId":1,"buyerId":1}},
+    {"collection":"conversations","fields":{"buyerId":1,"updatedAt":-1}},
+    {"collection":"conversations","fields":{"sellerId":1,"updatedAt":-1}},
+    {"collection":"messages","fields":{"conversationId":1,"moderationStatus":1,"deliveryState":1,"createdAt":-1}},
+    {"collection":"mediaFiles","fields":{"fileID":1}},
+    {"collection":"reports","fields":{"state":1,"createdAt":-1}},
+    {"collection":"reports","fields":{"reporterId":1,"createdAt":-1}},
+    {"collection":"moderationCases","fields":{"state":1,"createdAt":-1}},
+    {"collection":"moderationTasks","fields":{"status":1,"createdAt":1}},
+    {"collection":"riskEvents","fields":{"state":1,"createdAt":-1}},
+    {"collection":"outboxTasks","fields":{"state":1,"nextAt":1,"createdAt":1}},
+    {"collection":"notifications","fields":{"ownerId":1,"createdAt":-1}},
+    {"collection":"auditLogs","fields":{"sequence":1},"unique":true},
+    {"collection":"auditLogs","fields":{"actorId":1,"createdAt":-1}},
+    {"collection":"configVersions","fields":{"kind":1,"createdAt":-1}},
+    {"collection":"settings","fields":{"kind":1,"processed":1}},
+    {"collection":"userBlocks","fields":{"ownerId":1,"active":1,"createdAt":-1}},
+    {"collection":"booklistFeedback","fields":{"createdAt":-1}},
+    {"collection":"operationMetrics","fields":{"day":1}}
+  ]
+}

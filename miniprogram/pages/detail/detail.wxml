@@ -1,3 +1,4 @@
+<safety-tip />
 <block wx:if="{{goods}}">
   <!-- 图片轮播 -->
   <swiper wx:if="{{goods.images && goods.images.length}}" class="swiper" indicator-dots circular>
@@ -59,6 +60,8 @@
     </view>
   </view>
 
+  <view class="card" wx:if="{{!isMine && goods.status === 'on' && goods.enforcement !== 'removed' && goods.moderationStatus === 'approved'}}"><view bindtap="onReportSeller">举报卖家</view><view bindtap="onBlockSeller">拉黑卖家</view></view>
+  <view class="card" wx:if="{{goods.moderationStatus !== 'approved' || goods.enforcement === 'removed' || goods.status !== 'on'}}">商品状态：{{goods.enforcement === 'removed' ? '违规下架' : goods.moderationStatus !== 'approved' ? '审核中或未通过' : goods.status === 'locked' ? '已锁定' : goods.status === 'sold' ? '已售出' : '已下架'}}</view>
   <!-- 安全提示 -->
   <view class="card safety">
     <view class="safety-title">🔒 交易安全提示</view>
@@ -68,7 +71,7 @@
   </view>
 
   <!-- 底部操作栏 -->
-  <view class="action-bar" wx:if="{{!isMine}}">
+  <view class="action-bar" wx:if="{{!isMine && goods.status === 'on' && goods.enforcement !== 'removed' && goods.moderationStatus === 'approved'}}">
     <view class="action-report" bindtap="onReport">⚠️ 举报</view>
     <view class="action-chat" bindtap="onChat">💬 聊一聊</view>
     <view class="btn-brand action-btn" wx:if="{{goods.tradeType === '定价'}}" bindtap="onBuy">按 ¥{{goods.priceText}} 购买</view>

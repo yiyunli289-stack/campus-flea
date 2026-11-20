@@ -1,0 +1,8 @@
+<script setup lang="ts">
+import { onMounted, ref } from 'vue';import { ElMessage } from 'element-plus';import { api, session } from '../api';
+const stats=ref<Record<string,number>>({});const loading=ref(true);const error=ref('');
+const cards=[{key:'moderation',title:'待审核内容',path:'/records/moderation',note:'检测异常与人工复核'},{key:'reports',title:'待处理举报',path:'/records/reports',note:'用户反馈与恢复申诉'},{key:'risks',title:'待处置风险',path:'/records/risks',note:'交易异常与频率风险'},{key:'failedTasks',title:'失败任务',path:'/records/tasks',note:'查看原因并重新处理'}];
+async function load(){loading.value=true;error.value='';try{stats.value=await api('/dashboard');}catch(e){error.value=(e as Error).message;}finally{loading.value=false;}}
+onMounted(load);
+</script>
+<template><div class="page-intro"><div><span class="eyebrow">OVERVIEW</span><h1>治理工作台</h1><p>你好，{{ session.admin?.username }}。关注待办事项，及时处理内容与交易风险。</p></div><el-button @click="load">刷新数据</el-button></div><el-alert v-if="error" :title="error" type="error" show-icon :closable="false" class="mb"/><div v-loading="loading" class="stat-grid"><router-link v-for="(card,i) in cards" :key="card.key" :to="card.path" class="stat-card"><div class="stat-top">{{ card.title }}<span>0{{ i+1 }}</span></div><strong>{{ stats[card.key] ?? '—' }}</strong><div>{{ card.note }}<span>→</span></div></router-link></div><section class="panel guide"><div class="panel-heading"><h2>处置流程</h2><span class="muted">每次决策，保留依据</span></div><div class="workflow"><div v-for="(step,i) in ['核查必要证据','确认处理措施','同步用户与业务','保留审计记录']" :key="step"><span>{{ i+1 }}</span><strong>{{ step }}</strong></div></div></section><section class="panel notice"><h2>工作提醒</h2><p>查看案件所需的最少信息，避免传播用户隐私。封禁、下架及配置发布前，请确认影响范围并填写具体原因。</p><p class="muted">运营只读账号仅可浏览脱敏列表，审核和配置操作需相应授权。</p></section></template>

@@ -2,7 +2,7 @@ const app = getApp();
 const { CAMPUS_LIST, CONDITIONS, NOTE_LEVELS } = require('../../utils/constants');
 const { ALL_COLLEGES } = require('../../utils/colleges');
 
-Page({
+require('../../utils/page')({
   data: {
     list: [],
     source: '',
@@ -29,7 +29,7 @@ Page({
       isbn: b.isbn || '',
       price: '',
       noteLevel: '',
-      rawText: (b.raw || []).join(' / ')
+      rawText: (b.raw || []).join(' / '), images: b.images || [], innerPhotos: b.innerPhotos || []
     }));
     this.setData({
       list,
@@ -39,6 +39,7 @@ Page({
     });
   },
 
+  chooseBookImages(e) { const i = Number(e.currentTarget.dataset.i); const field = e.currentTarget.dataset.kind; wx.chooseMedia({ count: 3, mediaType: ['image'], success: r => this.setData({ ['list[' + i + '].' + field]: r.tempFiles.map(f => f.tempFilePath) }) }); },
   onItemInput(e) {
     const i = e.currentTarget.dataset.i;
     const field = e.currentTarget.dataset.field;
@@ -74,6 +75,7 @@ Page({
 
     for (let i = 0; i < list.length; i++) {
       if (!list[i].title.trim()) return wx.showToast({ title: '第 ' + (i + 1) + ' 本缺书名', icon: 'none' });
+      if (!list[i].images.length || (list[i].noteLevel !== '无笔记' && !list[i].innerPhotos.length)) return wx.showToast({ title: '第 ' + (i + 1) + ' 本缺实物或内页图', icon: 'none' });
       if (!list[i].noteLevel) return wx.showToast({ title: '第 ' + (i + 1) + ' 本请确认笔记等级', icon: 'none' });
       if (!(Number(list[i].price) > 0)) return wx.showToast({ title: '第 ' + (i + 1) + ' 本缺价格', icon: 'none' });
     }
@@ -89,6 +91,8 @@ Page({
       const fail = [];
       for (const it of list) {
         try {
+          it.images = await Promise.all(it.images.map(f => app.uploadFile(f).then(r => r.fileID)));
+          it.innerPhotos = await Promise.all(it.innerPhotos.map(f => app.uploadFile(f).then(r => r.fileID)));
           await app.call('goods', {
             action: 'publish',
             cat: 'book',
@@ -98,7 +102,7 @@ Page({
             price: Number(it.price),
             condition,
             campus,
-            images: [],
+            images: it.images, innerPhotos: it.innerPhotos,
             isbn: it.isbn,
             author: it.author,
             publisher: it.publisher,
@@ -111,15 +115,15 @@ Page({
           });
           ok++;
         } catch (e) {
-          fail.push(it.title || it.isbn || '未命名');
+          fail.push({ ...it, error: e.message });
         }
       }
       wx.hideLoading();
       this.setData({ publishing: false });
-      wx.removeStorageSync('ocrCandidates');
+      if (fail.length) wx.setStorageSync('ocrCandidates', { list: fail, source: this.data.source }); else wx.removeStorageSync('ocrCandidates');
       wx.showModal({
-        title: '发布完成',
-        content: '成功 ' + ok + ' 本' + (fail.length ? '，失败 ' + fail.length + ' 本：' + fail.slice(0, 3).join('、') : ''),
+        title: '提交审核完成',
+        content: '成功 ' + ok + ' 本' + (fail.length ? '，失败 ' + fail.length + ' 本：' + fail.slice(0, 3).map(x => x.title + '：' + x.error).join('、') : ''),
         showCancel: false,
         success: () => wx.redirectTo({ url: '/pages/my-goods/my-goods' })
       });

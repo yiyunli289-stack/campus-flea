@@ -1,0 +1,40 @@
+{
+  "name": "campus-flea-workspace",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "admin-web"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev-server.js",
+    "start:cloud": "node --env-file-if-exists=.env.cloud scripts/cloud-admin.js",
+    "check:cloud": "node --env-file-if-exists=.env.cloud scripts/cloud-admin.js --check",
+    "bootstrap:cloud": "node --env-file-if-exists=.env.cloud scripts/bootstrap.js",
+    "dev:web": "npm run dev --workspace admin-web",
+    "test": "node --test tests/*.test.js",
+    "check": "node scripts/check.js",
+    "build": "npm run build --workspace admin-web && node scripts/build-cloud.js",
+    "build:cloud": "node scripts/build-cloud.js",
+    "bootstrap": "node scripts/bootstrap.js",
+    "migrate": "node scripts/migrate.js",
+    "archive": "node scripts/archive.js"
+  },
+  "dependencies": {
+    "@cloudbase/node-sdk": "^4.2.1",
+    "cos-nodejs-sdk-v5": "^3.0.0",
+    "fast-xml-parser": "^5.3.0",
+    "wx-server-sdk": "^4.0.2"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.1"
+  },
+  "overrides": {
+    "wx-server-sdk": {
+      "@cloudbase/node-sdk": "$@cloudbase/node-sdk"
+    },
+    "axios": "^1.21.1"
+  }
+}

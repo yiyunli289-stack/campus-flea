@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "scripts": {
+    "test": "node --test index.test.js"
+  },
   "dependencies": {
     "wx-server-sdk": "~2.6.3"
   }

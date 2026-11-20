@@ -63,6 +63,17 @@ async function updateProfile(params, openid) {
     next.profileComplete = !!(next.nickName && next.campus && next.contact);
 
     await db.collection('users').doc(cur._id).update({ data: next });
+
+    // 商品中保存了卖家展示信息的快照。资料变更后同步所有历史商品，
+    // 避免首页、搜索结果和详情页继续展示旧昵称、头像或学院。
+    await db.collection('goods').where({ sellerId: openid }).update({
+      data: {
+        sellerName: next.nickName || '',
+        sellerAvatar: next.avatarUrl || '',
+        sellerCollege: next.college || ''
+      }
+    });
+
     return { code: 0, data: { ...cur, ...next } };
   } catch (err) {
     console.error('updateProfile error:', err);

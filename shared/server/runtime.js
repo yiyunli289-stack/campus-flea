@@ -17,18 +17,37 @@ function createRuntime() {
     },
     async image({fileID,openid}) {
       const url=(await provider.urls([fileID]))[0];
+      assert(url,'FILE_UNAVAILABLE','审核图片暂不可用',503);
       const r=await cloud.openapi.security.mediaCheckAsync({version:2,openid,scene:1,mediaType:2,mediaUrl:url});
-      const traceId=r.traceId||r.trace_id;assert(traceId,'DETECTION_UNAVAILABLE','图片检测未返回任务编号',503);
+      const traceId=r.traceId||r.trace_id;assert(url && traceId,'DETECTION_UNAVAILABLE','图片检测未返回任务编号',503);
       return {traceId,status:'pending'};
     },
     async urls(files) {
       const cloudFiles=files.filter(f=>f.startsWith('cloud://'));if(!cloudFiles.length)return files;
-      const r=await cloud.getTempFileURL({fileList:cloudFiles});const map=new Map(r.fileList.map(f=>[f.fileID,f.tempFileURL]));
-      return files.map(f=>{const url=map.get(f)||(!f.startsWith('cloud://')?f:'');assert(url,'FILE_UNAVAILABLE','图片暂不可用',503);return url;});
+      const r = await app.getTempFileURL({fileList:cloudFiles.map(fileID=>({fileID,maxAge:300}))});
+      const map = new Map(r.fileList.map(f=>[f.fileID,f.tempFileURL]));
+      return files.map(f=>f.startsWith('cloud://') ? map.get(f) || '' : f);
+    },
+    async uploadTicket(cloudPath) {
+      const {data} = await app.getUploadMetadata({cloudPath});
+      const fileID = data.fileId || data.fileID;
+      const cosFileID = data.cosFileId || data.cosFileID;
+      assert(fileID && cosFileID && data.authorization && data.token && data.url,
+        'FILE_UNAVAILABLE','上传服务暂不可用',503);
+      return {fileID,url:data.url,formData:{key:cloudPath,Signature:data.authorization,
+        'x-cos-security-token':data.token,'x-cos-meta-fileid':cosFileID}};
     },
     async inspect(fileID) {
-      const r=await cloud.downloadFile({fileID});const b=r.fileContent;
-      return {bytes:b.length,hash:hash(b.toString('base64')),image:(b[0]===0xff&&b[1]===0xd8&&b[2]===0xff)||b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))};
+      const {fileContent:content} = await cloud.downloadFile({fileID});
+      const png = content.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+      const jpeg = content[0]===0xff && content[1]===0xd8 && content[2]===0xff;
+      return {bytes:content.length,hash:crypto.createHash('sha256').update(content).digest('hex'),
+        image:jpeg || png,extension:png ? '.png' : '.jpg',content};
+    },
+    async freeze(cloudPath,fileContent) {
+      const result = await cloud.uploadFile({cloudPath,fileContent});
+      assert(result.fileID,'FILE_UNAVAILABLE','图片保存失败',503);
+      return result.fileID;
     }
   };
   const service=new Service(store,provider,process.env);
@@ -40,7 +59,9 @@ function entry(name) {
     if(name==='admin')return adminHttp(s,event);
     if(name==='governance-worker') {
       // Worker invocations from client SDKs have an OPENID and must never run jobs.
-      assert(!cloud.getWXContext().OPENID && process.env.TCB_SOURCE==='timer' && event?.Type==='Timer','FORBIDDEN','只允许平台定时触发任务',403);
+      const timer = process.env.TRIGGER_SRC === 'timer' || process.env.TCB_SOURCE === 'timer';
+      assert(!cloud.getWXContext().OPENID && timer && event?.Type === 'Timer' && event.TriggerName === 'governance-minute',
+        'FORBIDDEN','只允许平台定时触发任务',403);
       return runWorker(s,20);
     }
     if(name==='safety-callback')return require('./wechat-callback').callback(s,event);

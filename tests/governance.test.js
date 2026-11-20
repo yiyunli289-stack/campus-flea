@@ -1,9 +1,14 @@
 'use strict';
 const test=require('node:test');const assert=require('node:assert/strict');const {fixture}=require('./helpers');
 const {adminAction,evidence}=require('../shared/server/governance');const {runWorker}=require('../shared/server/worker');
-test('审核失败/服务异常内容不公开；人工复核后公开且记录通知审计',async()=>{
+test('检测服务暂时失败时保持在售，人工复核记录通知审计',async()=>{
   const f=await fixture({provider:{text:async()=>{throw new Error('service down');}}});const gid=await f.listing();
-  assert.deepEqual(await f.s.mini('goods',{action:'search'},'buyer'),[]);
+  assert.equal((await f.s.mini('goods',{action:'search'},'buyer'))[0]._id,gid);
+  await runWorker(f.s);
+  const job = (await f.store.find('outboxTasks',{kind:'review-goods'}))[0];
+  assert.equal(job.attempts,1);
+  assert.equal(job.state,'pending');
+  assert.equal((await f.s.mini('goods',{action:'search'},'buyer'))[0]._id,gid);
   const c=(await f.store.find('moderationCases',{targetId:gid}))[0];
   await adminAction(f.s,f.reviewer,{op:'moderation.decide',id:c._id,decision:'approved',confirm:true,reason:'人工核查内容合规'});
   assert.equal((await f.s.mini('goods',{action:'search'},'buyer')).length,1);

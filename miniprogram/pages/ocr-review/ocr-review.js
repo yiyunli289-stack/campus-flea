@@ -17,6 +17,12 @@ require('../../utils/page')({
     publishing: false
   },
 
+  onShow() {
+    app.refreshAccount()
+      .then(user => this.setData({restriction:app.capabilityError(user,'publish')?.message || ''}))
+      .catch(error => this.setData({restriction:error.message}));
+  },
+
   onLoad() {
     const saved = wx.getStorageSync('ocrCandidates') || { list: [], source: '' };
     const user = app.globalData.userInfo || {};
@@ -84,7 +90,7 @@ require('../../utils/page')({
     const condition = this.data.conditions[this.data.conditionIndex];
     const college = this.data.colleges[this.data.collegeIndex];
 
-    app.ensureProfile().then(async () => {
+    app.ensureProfile('publish').then(async () => {
       this.setData({ publishing: true });
       wx.showLoading({ title: '发布中', mask: true });
       let ok = 0;

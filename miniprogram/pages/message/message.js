@@ -4,9 +4,9 @@ const { fmtTime } = require('../../utils/format');
 require('../../utils/page')({
   data: { list: [], loggedIn: false },
 
-  onShow() {
-    const me = app.globalData.userInfo;
-    if (!me || !me.profileComplete) {
+  async onShow() {
+    const me = await app.refreshAccount().catch(() => null);
+    if (!me || me.accountStatus === 'deleted') {
       this.setData({ loggedIn: false, list: [] });
       return;
     }

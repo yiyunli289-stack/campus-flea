@@ -13,7 +13,7 @@ require('../../utils/page')({
     ]
   },
 
-  onShow() { this.setData({ userInfo: app.globalData.userInfo }); },
+  onShow() { app.refreshAccount().then(userInfo => this.setData({userInfo})).catch(app.showActionError); },
 
   onLogin() {
     wx.showLoading({ title: '登录中' });
@@ -21,7 +21,7 @@ require('../../utils/page')({
       .then((user) => {
         wx.hideLoading();
         this.setData({ userInfo: user });
-        if (!user.profileComplete) wx.navigateTo({ url: '/pages/profile/profile' });
+        if (!app.capabilityError(user,'profile') && !user.profileComplete) wx.navigateTo({ url: '/pages/profile/profile' });
       })
       .catch((err) => {
         wx.hideLoading();
@@ -29,25 +29,15 @@ require('../../utils/page')({
       });
   },
 
-  onEditProfile() { wx.navigateTo({ url: '/pages/profile/profile' }); },
+  async onEditProfile() {
+    try { await app.ensureProfile('profile'); wx.navigateTo({url:'/pages/profile/profile'}); }
+    catch (error) { app.showActionError(error); }
+  },
 
   onMenu(e) {
     const url = e.currentTarget.dataset.url;
     if (url) wx.navigateTo({ url });
     else wx.showToast({ title: '建设中', icon: 'none' });
-  },
-
-  onSeed() {
-    wx.showLoading({ title: '初始化中' });
-    app.call('goods', { action: 'seed' })
-      .then((r) => {
-        wx.hideLoading();
-        wx.showToast({ title: '已添加 ' + r.count + ' 条演示数据', icon: 'none' });
-      })
-      .catch((err) => {
-        wx.hideLoading();
-        wx.showToast({ title: err.message, icon: 'none' });
-      });
   },
 
   onAbout() {

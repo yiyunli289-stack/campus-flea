@@ -8,7 +8,17 @@ exports.main = async (event) => {
   const { action } = event || {};
   const { OPENID } = cloud.getWXContext();
   if (!OPENID) return { code: -1, msg: '未登录' };
-  if (action === 'ocrImage') { const { service } = require('./lib/runtime').createRuntime(); try { await service.user(OPENID, 'publish'); await require('./lib/moderation').validateFiles(service, OPENID, [event.fileID]); return ocrImage(event); } catch (e) { return { code: e.code || -1, msg: e.message }; } }
+  if (action === 'ocrImage') {
+    try {
+      const { service } = require('./lib/runtime').createRuntime();
+      await service.user(OPENID, 'publish');
+      await service.user(OPENID, 'upload', service.store, false);
+      await require('./lib/moderation').validateFiles(service, OPENID, [event.fileID]);
+      return ocrImage(event);
+    } catch (error) {
+      return { code: error.code || 'INTERNAL_ERROR', msg: error.status >= 500 ? '服务暂不可用' : error.message };
+    }
+  }
   return { code: -1, msg: '未知操作' };
 };
 

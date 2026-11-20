@@ -2,7 +2,7 @@
   <!-- 用户信息头 -->
   <view class="head">
     <view class="avatar">
-      <image wx:if="{{userInfo && userInfo.avatarUrl}}" class="avatar-img" src="{{userInfo.avatarUrl}}" />
+      <image wx:if="{{userInfo && userInfo.avatarPreview}}" class="avatar-img" src="{{userInfo.avatarPreview}}" />
       <text wx:else class="avatar-emoji">👤</text>
     </view>
 

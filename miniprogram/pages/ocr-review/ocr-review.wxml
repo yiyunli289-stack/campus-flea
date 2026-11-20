@@ -1,3 +1,5 @@
+<view class="card" wx:if="{{restriction}}">{{restriction}}</view>
+<block wx:else>
 <safety-tip />
 <view class="page">
   <view class="head-tip">
@@ -82,3 +84,5 @@
 
   <view class="btn-brand pub-btn" wx:if="{{list.length}}" bindtap="onPublish">{{publishing ? '发布中…' : '确认并全部发布'}}</view>
 </view>
+
+</block>

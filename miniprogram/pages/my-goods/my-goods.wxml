@@ -7,15 +7,19 @@
       </view>
       <view class="i-main">
         <view class="i-title">{{item.title}}</view>
-        <view class="i-meta">¥{{item.priceText}} · {{item.timeText}}</view>
+        <view class="i-meta" wx:if="{{item.status !== 'removed'}}">¥{{item.priceText}} · {{item.timeText}}</view>
         <view class="i-status s-{{item.status}}">{{item.displayState}}</view>
+        <view wx:if="{{item.governanceReason}}">{{item.governanceReason}}</view>
       </view>
     </view>
     <view class="i-actions"><view class="i-btn" wx:if="{{item.enforcement === 'removed'}}" catchtap="onAppeal" data-id="{{item._id}}">申请复核</view>
       <view class="i-btn" wx:if="{{item.status === 'on'}}" catchtap="onOffers" data-id="{{item._id}}">查看报价</view>
-      <view class="i-btn" wx:if="{{item.status === 'on'}}" catchtap="onOffShelf" data-id="{{item._id}}">下架</view>
-      <view class="i-btn primary" wx:if="{{item.status === 'locked'}}" catchtap="onComplete" data-id="{{item._id}}">确认成交</view>
-      <view class="i-btn" wx:if="{{item.status === 'off' && item.enforcement !== 'removed' && item.moderationStatus === 'approved'}}" catchtap="onRelist" data-id="{{item._id}}">重新上架</view>
+      <view class="i-btn" wx:if="{{item.canManage && (item.status === 'on' || item.status === 'draft')}}" catchtap="onEdit" data-id="{{item._id}}">编辑</view>
+      <view class="i-btn" wx:if="{{item.canManage && item.status === 'on'}}" catchtap="onOffShelf" data-id="{{item._id}}">下架</view>
+      <view class="i-btn primary" wx:if="{{item.canManage && (item.status === 'locked' || item.status === 'on')}}" catchtap="onComplete" data-id="{{item._id}}">确认成交</view>
+      <view class="i-btn" wx:if="{{item.canManage && item.status === 'off' && item.enforcement !== 'removed'}}" catchtap="onRelist" data-id="{{item._id}}">重新上架</view>
+      <view class="i-btn" wx:if="{{item.canManage && (item.status === 'off' || item.status === 'draft') && item.enforcement !== 'removed'}}" catchtap="onDelete" data-id="{{item._id}}">删除</view>
+      <view class="i-btn" wx:if="{{item.canUndoSold}}" catchtap="onUndoSold" data-id="{{item._id}}">撤回售出</view>
     </view>
   </view>
 

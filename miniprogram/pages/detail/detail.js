@@ -13,6 +13,7 @@ require('../../utils/page')({
   onShow() { this.fetch(); },
 
   fetch() {
+    this.setData({goods:null});
     app.call('goods', { action: 'detail', id: this.id })
       .then((g) => {
         const goods = decorateGoods([g])[0];
@@ -22,7 +23,8 @@ require('../../utils/page')({
         this.setData({
           goods,
           isBook: goods.cat === 'book',
-          isMine: !!(me && goods.sellerId === me._openid),
+          isMine: goods.isOwner || !!(me && goods.sellerId === me._openid),
+          stateText: ({locked:'已锁定',sold:'已售出',off:'已下架',draft:'草稿',removed:'违规下架'})[goods.status] || '',
           timeText: fmtTime(goods.createdAt)
         });
       })
@@ -46,7 +48,7 @@ require('../../utils/page')({
   },
 
   makeOffer(price) {
-    app.ensureProfile().then(() => {
+    app.ensureProfile('offer').then(() => {
       wx.showLoading({ title: '提交中' });
       app.call('offer', { action: 'create', goodsId: this.id, price })
         .then(() => {
@@ -54,15 +56,17 @@ require('../../utils/page')({
           wx.showToast({ title: '已提交，等卖家处理', icon: 'none' });
         })
         .catch((err) => { wx.hideLoading(); wx.showToast({ title: err.message, icon: 'none' }); });
-    }).catch(() => {});
+    }).catch(err => app.showActionError(err));
   },
 
-  onChat() {
-    app.ensureProfile().then(() => {
-      app.call('chat', { action: 'open', goodsId: this.id })
-        .then((conv) => wx.navigateTo({ url: '/pages/chat/chat?id=' + conv._id }))
-        .catch((err) => wx.showToast({ title: err.message, icon: 'none' }));
-    }).catch(() => {});
+  async onChat() {
+    try {
+      await app.ensureProfile('message');
+      const conversation = await app.call('chat', { action: 'open', goodsId: this.id });
+      wx.navigateTo({ url: '/pages/chat/chat?id=' + conversation._id });
+    } catch (error) {
+      if (error.message !== '请先完善资料') app.showActionError(error);
+    }
   },
 
   onReportSeller() { require('../../utils/governance').report('users', this.data.goods.sellerId); },

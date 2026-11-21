@@ -1,5 +1,6 @@
 const app = getApp();
 const { decorateGoods, fmtTime } = require('../../utils/format');
+const {requestId} = require('../../utils/notifications');
 
 Page({
   data: {
@@ -45,16 +46,23 @@ Page({
     });
   },
 
-  makeOffer(price) {
-    app.ensureProfile().then(() => {
-      wx.showLoading({ title: '提交中' });
-      app.call('offer', { action: 'create', goodsId: this.id, price })
-        .then(() => {
-          wx.hideLoading();
-          wx.showToast({ title: '已提交，等卖家处理', icon: 'none' });
-        })
-        .catch((err) => { wx.hideLoading(); wx.showToast({ title: err.message, icon: 'none' }); });
-    }).catch(() => {});
+  async makeOffer(price) {
+    if (this.submittingOffer) return;
+    this.submittingOffer = true;
+    try {
+      await app.ensureProfile();
+      const key = JSON.stringify([this.id,price]);
+      if (this.pendingOffer?.key !== key) this.pendingOffer = {key,id:requestId()};
+      wx.showLoading({title:'提交中',mask:true});
+      const result = await app.call('offer',{action:'create',goodsId:this.id,price,requestId:this.pendingOffer.id});
+      this.pendingOffer = null;
+      wx.hideLoading();
+      wx.showToast({title:'已提交，等卖家处理',icon:'none'});
+      if (result.conversationId) app.openChat(result.conversationId);
+    } catch (error) {
+      wx.hideLoading();
+      if (error.message !== '请先完善资料') wx.showToast({title:error.message,icon:'none'});
+    } finally { this.submittingOffer = false; }
   },
 
   onChat() {

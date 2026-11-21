@@ -4,10 +4,15 @@
     <view class="chat-contact" bindtap="callContact">{{other.contact ? '复制联系方式' : '成交后可见联系方式'}}</view>
   </view>
 
+  <view wx:if="{{subscriptionOptions.length}}">
+    <button wx:for="{{subscriptionOptions}}" wx:key="templateId" size="mini" bindtap="onSubscribe" data-template="{{item.templateId}}">订阅{{item.events[0]}}</button>
+  </view>
   <scroll-view class="msg-list" scroll-y scroll-x="{{false}}" scroll-into-view="{{lastId}}" enhanced show-scrollbar="{{false}}">
     <view class="msg-inner">
       <view wx:for="{{messages}}" wx:key="_id" id="m{{index}}">
-        <view class="sys" wx:if="{{item.sys}}">{{item.content}}</view>
+        <view class="sys" wx:if="{{item.sys}}">
+          {{item.content}}<button wx:if="{{item.offerId}}" size="mini" bindtap="onOpenOffer">查看申请</button>
+        </view>
         <view class="bubble-row {{item.mine ? 'mine' : ''}}" wx:else>
           <view class="bubble">{{item.content}}</view>
         </view>
@@ -15,7 +20,8 @@
     </view>
   </scroll-view>
 
-  <view class="input-bar">
+  <view wx:if="{{!canSend}}" class="sys">当前会话可查看历史</view>
+  <view class="input-bar" wx:else>
     <input class="ib-input" placeholder="输入消息…" value="{{input}}" bindinput="onInput" confirm-type="send" bindconfirm="send" />
     <view class="ib-send" bindtap="send">发送</view>
   </view>

@@ -13,6 +13,19 @@ App({
     this.globalData.userInfo = wx.getStorageSync('userInfo') || null;
   },
 
+  onShow() { this.refreshUnread(); },
+
+  refreshUnread() {
+    if (!this.globalData.userInfo) return Promise.resolve(0);
+    if (this._notificationUnread) return this._notificationUnread;
+    this._notificationUnread = this.call('notification',{action:'unread'}).then(({count}) => {
+      if (count) wx.setTabBarBadge({index:3,text:count>99?'99+':String(count),fail(){}});
+      else wx.removeTabBarBadge({index:3,fail(){}});
+      return count;
+    }).catch(() => 0).finally(() => {this._notificationUnread = null;});
+    return this._notificationUnread;
+  },
+
   // 统一云函数调用封装：code!==0 抛错；未部署/调用失败给出可执行的提示
   call(name, data) {
     return wx.cloud

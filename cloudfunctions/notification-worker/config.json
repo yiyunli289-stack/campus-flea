@@ -1,0 +1,5 @@
+{
+  "triggers": [{ "name": "notification-minute", "type": "timer", "config": "0 * * * * * *" }],
+  "permissions": { "openapi": ["subscribeMessage.send"] },
+  "timeout": 55
+}

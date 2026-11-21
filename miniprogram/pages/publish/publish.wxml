@@ -68,6 +68,10 @@
         <view class="picker-val">{{campus}} ›</view>
       </picker>
     </view>
+    <view class="field">
+      <text class="label">报价有效期（小时）</text>
+      <input class="input" type="number" value="{{offerDurationHours}}" data-field="offerDurationHours" bindinput="onInput" />
+    </view>
     <view class="field field-area">
       <text class="label">描述</text>
       <textarea class="textarea" placeholder="成色、使用情况、转手原因…" value="{{desc}}" data-field="desc" bindinput="onInput" />

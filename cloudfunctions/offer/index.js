@@ -1,9 +1,10 @@
 // 云函数：报价/购买意向（创建、收到的、我发出的、卖家择一锁定、取消）
 // 对应需求：FR-P0-OFF-01 买家出价/购买意向、FR-P0-SEL-03 卖家择一 + 锁定状态机
 const cloud = require('wx-server-sdk');
-const crypto = require('crypto');
+const {failure, due, invalidListing, cycle, hour} = require('./lib/core');
+const {submitOffer, changeOffer} = require('./lib/trade');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
-const db = cloud.database();
+const db = cloud.database({throwOnNotFound:false});
 const _ = db.command;
 
 exports.main = async (event) => {
@@ -11,47 +12,22 @@ exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext();
   if (!OPENID) return { code: -1, msg: '未登录' };
 
-  switch (action) {
-    case 'create': return create(params, OPENID);
-    case 'received': return list(params, OPENID, 'sellerId');
-    case 'sent': return list(params, OPENID, 'buyerId');
-    case 'accept': return accept(params, OPENID);
-    case 'cancel': return cancel(params, OPENID);
-    default: return { code: -1, msg: '未知操作' };
-  }
-};
-
-async function create(params, openid) {
   try {
-    const gRes = await db.collection('goods').doc(params.goodsId).get();
-    const g = gRes.data;
-    if (!g) return { code: -1, msg: '商品不存在' };
-    if (g.status !== 'on') return { code: -1, msg: '商品已不在售' };
-    if (g.sellerId === openid) return { code: -1, msg: '不能报价自己的商品' };
-
-    const dup = await db.collection('offers').where({ goodsId: g._id, buyerId: openid, status: 'pending' }).get();
-    if (dup.data.length) return { code: -1, msg: '你已报过价，等待卖家处理' };
-
-    const now = Date.now();
-    const offer = {
-      _openid: openid,
-      goodsId: g._id,
-      goodsTitle: g.title,
-      goodsCover: (g.images && g.images[0]) || '',
-      sellerId: g.sellerId,
-      buyerId: openid,
-      price: Number(params.price) || 0,
-      message: params.message || '',
-      status: 'pending',
-      createdAt: now
-    };
-    const addRes = await db.collection('offers').add({ data: offer });
-    return { code: 0, data: { _id: addRes._id } };
-  } catch (e) {
-    console.error('offer.create error:', e);
-    return { code: -1, msg: '提交失败：' + e.message };
-  }
-}
+    switch (action) {
+      case 'create':
+      case 'update': return await submitOffer(db,{action,...params},OPENID,Date.now());
+      case 'accept':
+      case 'cancel':
+      case 'decline':
+      case 'cancelLock':
+      case 'restoreListing':
+      case 'confirmMeetup': return await changeOffer(db,{action,...params},OPENID,Date.now());
+      case 'received': return await list(params,OPENID,'sellerId');
+      case 'sent': return await list(params,OPENID,'buyerId');
+      default: return {code:-1,msg:'未知操作'};
+    }
+  } catch(error) { return failure(error,'购买申请操作失败'); }
+};
 
 async function list(params, openid, field) {
   try {
@@ -74,85 +50,37 @@ async function enrich(offers) {
     if (o.sellerId && !ids.includes(o.sellerId)) ids.push(o.sellerId);
   });
   const users = {};
-  if (ids.length) {
-    const u = await db.collection('users').where({ _openid: _.in(ids) }).get();
+  for (let i = 0; i < ids.length; i += 50) {
+    const u = await db.collection('users').where({ _openid: _.in(ids.slice(i,i+50)) }).limit(50).get();
     u.data.forEach((x) => { users[x._openid] = x; });
   }
-  return offers.map((o) => {
+  const goodsIds = [...new Set(offers.map(o=>o.goodsId))];
+  const goods = new Map();
+  for (let i = 0; i < goodsIds.length; i += 50) {
+    const rows = await db.collection('goods').where({_id:_.in(goodsIds.slice(i,i+50))}).limit(50).get();
+    for (const row of rows.data) goods.set(row._id,row);
+  }
+  const now = Date.now();
+  return offers.map(o => {
     const buyer = users[o.buyerId] || {};
     const seller = users[o.sellerId] || {};
-    const locked = o.status === 'accepted'; // 成交锁定后互相可见联系方式
-    return {
-      ...o,
-      buyerName: buyer.nickName || '匿名',
-      buyerCollege: buyer.college || '',
-      buyerContact: locked ? (buyer.contact || '') : '',
-      sellerName: seller.nickName || '匿名',
-      sellerCollege: seller.college || '',
-      sellerContact: locked ? (seller.contact || '') : ''
-    };
-  });
-}
-
-async function accept(params, openid) {
-  try {
-    const oRes = await db.collection('offers').doc(params.offerId).get();
-    const o = oRes.data;
-    if (!o) return { code: -1, msg: '报价不存在' };
-    if (o.sellerId !== openid) return { code: -1, msg: '无权操作' };
-    if (o.status !== 'pending') return { code: -1, msg: '该报价已处理' };
-
-    const gRes = await db.collection('goods').doc(o.goodsId).get();
-    const g = gRes.data;
-    if (!g || g.status !== 'on') return { code: -1, msg: '商品已不在售' };
-
-    const now = Date.now();
-    // 卖家择一：接受该报价、拒绝该商品其余待处理报价、锁定商品
-    await db.collection('offers').doc(o._id).update({ data: { status: 'accepted' } });
-    await db.collection('offers').where({ goodsId: o.goodsId, status: 'pending' }).update({ data: { status: 'rejected' } });
-    await db.collection('goods').doc(o.goodsId).update({ data: { status: 'locked', buyerId: o.buyerId, dealPrice: o.price, updatedAt: now } });
-
-    // 自动建立/更新会话，通知买家
-    const exist = await db.collection('conversations').where({ goodsId: o.goodsId, sellerId: openid, buyerId: o.buyerId }).get();
-    const sysMsg = '交易已锁定，成交价 ¥' + o.price + '，请线下联系完成面交';
-    if (exist.data.length) {
-      const cid = exist.data[0]._id;
-      await db.collection('conversations').doc(cid).update({ data: { lastMsg: sysMsg, lastTime: now, updatedAt: now, unreadBuyer: _.inc(1) } });
-      await db.collection('messages').add({ data: { _openid: openid, conversationId: cid, fromId: 'system', toId: o.buyerId, content: sysMsg, createdAt: now } });
-    } else {
-      // 与 chat 云函数使用同一固定 _id，避免并发建出两条会话
-      const convId = convDocId(o.goodsId, o.buyerId);
-      const conv = { _id: convId, _openid: openid, goodsId: o.goodsId, goodsTitle: o.goodsTitle, goodsCover: o.goodsCover, sellerId: openid, buyerId: o.buyerId, lastMsg: sysMsg, lastTime: now, unreadSeller: 0, unreadBuyer: 1, updatedAt: now };
-      try {
-        await db.collection('conversations').add({ data: conv });
-      } catch (e) {
-        await db.collection('conversations').doc(convId)
-          .update({ data: { lastMsg: sysMsg, lastTime: now, updatedAt: now, unreadBuyer: _.inc(1) } })
-          .catch(() => {});
-      }
-      await db.collection('messages').add({ data: { _openid: openid, conversationId: convId, fromId: 'system', toId: o.buyerId, content: sysMsg, createdAt: now } });
+    const g = goods.get(o.goodsId);
+    let status = o.status;
+    if (status === 'pending') {
+      if (invalidListing(g) || cycle(g) !== (o.listingCycle || '')) status = 'closed';
+      else if (g.status === 'locked') status = 'rejected';
+      else if (g.status !== 'on') status = 'closed';
+      else if (due(o) <= now) status = 'expired';
     }
-    return { code: 0, data: { status: 'accepted' } };
-  } catch (e) {
-    console.error('offer.accept error:', e);
-    return { code: -1, msg: '操作失败：' + e.message };
-  }
-}
-
-// 与 chat 云函数保持一致：商品 + 买家 决定会话 _id
-function convDocId(goodsId, buyerId) {
-  return 'c' + crypto.createHash('md5').update(goodsId + '_' + buyerId).digest('hex');
-}
-
-async function cancel(params, openid) {
-  try {
-    const oRes = await db.collection('offers').doc(params.offerId).get();
-    const o = oRes.data;
-    if (!o || o.buyerId !== openid) return { code: -1, msg: '无权操作' };
-    if (o.status !== 'pending') return { code: -1, msg: '报价已处理，无法取消' };
-    await db.collection('offers').doc(o._id).update({ data: { status: 'cancelled' } });
-    return { code: 0, data: { status: 'cancelled' } };
-  } catch (e) {
-    return { code: -1, msg: '操作失败' };
-  }
+    const locked = status === 'accepted' && !invalidListing(g) && g.status === 'locked' &&
+      g.buyerId === o.buyerId && (!g.acceptedOfferId || g.acceptedOfferId === o._id);
+    if (status === 'accepted' && !locked) {
+      status = g?.status === 'sold' && g.buyerId === o.buyerId ? 'completed' : 'closed';
+    }
+    return {...o,status,tradeType:o.tradeType || g?.tradeType,canTrade:locked,
+      canRestore:locked && !g.meetupConfirmedAt && now >= Number(g.lockedAt || o.acceptedAt || g.updatedAt) + 48 * hour,
+      buyerName:buyer.nickName || '匿名',buyerCollege:buyer.college || '',
+      buyerContact:locked ? buyer.contact || '' : '',sellerName:seller.nickName || '匿名',
+      sellerCollege:seller.college || '',sellerContact:locked ? seller.contact || '' : ''};
+  });
 }

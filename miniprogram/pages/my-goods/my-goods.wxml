@@ -13,6 +13,7 @@
     </view>
     <view class="i-actions">
       <view class="i-btn" wx:if="{{item.status === 'on'}}" catchtap="onOffers" data-id="{{item._id}}">查看报价</view>
+      <view class="i-btn" wx:if="{{item.status === 'on'}}" catchtap="onEdit" data-id="{{item._id}}">编辑</view>
       <view class="i-btn" wx:if="{{item.status === 'on'}}" catchtap="onOffShelf" data-id="{{item._id}}">下架</view>
       <view class="i-btn primary" wx:if="{{item.status === 'locked'}}" catchtap="onComplete" data-id="{{item._id}}">确认成交</view>
       <view class="i-btn" wx:if="{{item.status === 'off'}}" catchtap="onRelist" data-id="{{item._id}}">重新上架</view>

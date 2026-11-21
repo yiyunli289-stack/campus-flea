@@ -1,5 +1,6 @@
 const app = getApp();
 const { decorateGoods, fmtTime } = require('../../utils/format');
+const {CONDITIONS,NOTE_LEVELS} = require('../../utils/constants');
 
 Page({
   data: {
@@ -23,6 +24,24 @@ Page({
   goDetail(e) { wx.navigateTo({ url: '/pages/detail/detail?id=' + e.currentTarget.dataset.id }); },
 
   onOffers(e) { wx.navigateTo({ url: '/pages/offers/offers?goodsId=' + e.currentTarget.dataset.id }); },
+
+  onEdit(e) {
+    const listing = this.data.list.find(item=>item._id === e.currentTarget.dataset.id);
+    if (!listing) return;
+    const fields = [['title','标题'],['price','价格'],['condition','成色'],['offerDurationHours','报价有效期（小时）']];
+    if (listing.cat === 'book') fields.push(['noteLevel','笔记等级'],['noteDesc','笔记说明'],['defects','缺损']);
+    wx.showActionSheet({itemList:fields.map(row=>row[1]),success:result=>{
+      const [key,label] = fields[result.tapIndex];
+      const choices = key === 'condition' ? CONDITIONS : key === 'noteLevel' ? NOTE_LEVELS : null;
+      const submit = async value => {
+        try { await app.call('goods',{action:'edit',id:listing._id,[key]:value}); this.load(); }
+        catch (error) { wx.showToast({title:error.message,icon:'none'}); }
+      };
+      if (choices) wx.showActionSheet({itemList:choices,success:item=>submit(choices[item.tapIndex])});
+      else wx.showModal({title:'修改'+label,editable:true,content:String(listing[key] ?? (key === 'offerDurationHours'?48:'')),
+        success:edit=>{if (edit.confirm) submit(edit.content || '');}});
+    }});
+  },
 
   onOffShelf(e) {
     app.call('goods', { action: 'offShelf', id: e.currentTarget.dataset.id })

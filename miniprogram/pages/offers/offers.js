@@ -1,13 +1,19 @@
 const app = getApp();
 const { fmtTime, fmtPrice } = require('../../utils/format');
+const {requestId,warmSubscription,subscribeTap} = require('../../utils/notifications');
 
-const ST = { pending: '待处理', accepted: '已成交', rejected: '未选中', cancelled: '已取消' };
+const ST = {pending:'待处理',accepted:'已锁定',rejected:'未选中或已拒绝',cancelled:'已撤回',
+  expired:'已到期',closed:'已关闭',completed:'已售出'};
 
 Page({
-  data: { tab: 'received', received: [], sent: [] },
+  data: { tab: 'received', received: [], sent: [], subscriptionOptions:[] },
 
-  onLoad(query) { this.goodsId = query.goodsId || ''; },
-  onShow() { this.load(); },
+  onLoad(query) {
+    this.goodsId = query.goodsId || '';
+    this.setData({tab:query.tab === 'sent'?'sent':'received'});
+  },
+  onShow() { this.load(); warmSubscription(this,'trade'); },
+  onSubscribe(e) { subscribeTap(this,e); },
 
   load() {
     app.ensureProfile().then(() => {
@@ -49,6 +55,31 @@ Page({
     app.call('offer', { action: 'cancel', offerId: e.currentTarget.dataset.id })
       .then(() => this.load())
       .catch((err) => wx.showToast({ title: err.message, icon: 'none' }));
+  },
+
+  onOfferAction(e) {
+    const {action,id} = e.currentTarget.dataset;
+    const labels = {update:'修改报价',decline:'拒绝申请',cancelLock:'取消面交锁定',
+      restoreListing:'恢复在售',confirmMeetup:'确认面交安排'};
+    const editable = ['update','cancelLock'].includes(action);
+    wx.showModal({title:labels[action],editable,
+      placeholderText:action === 'update'?'新的报价金额':'填写取消原因',
+      success:async result => {
+        if (!result.confirm) return;
+        const params = {action,offerId:id};
+        if (action === 'update') {
+          const key = JSON.stringify([id,result.content]);
+          if (this.pendingUpdate?.key !== key) this.pendingUpdate = {key,id:requestId()};
+          Object.assign(params,{price:Number(result.content),requestId:this.pendingUpdate.id});
+        }
+        if (action === 'cancelLock') params.reason = result.content || '';
+        try {
+          await app.call('offer',params);
+          if (action === 'update') this.pendingUpdate = null;
+          this.load();
+        } catch (error) { wx.showToast({title:error.message,icon:'none'}); }
+      }
+    });
   },
 
   onChat(e) {

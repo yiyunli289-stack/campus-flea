@@ -4,6 +4,7 @@
     "pages/search/search",
     "pages/publish/publish",
     "pages/message/message",
+    "pages/notification/notification",
     "pages/mine/mine",
     "pages/college/college",
     "pages/detail/detail",

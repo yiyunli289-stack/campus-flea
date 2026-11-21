@@ -1,0 +1,44 @@
+{
+  "chat.consult": {
+    "id": "",
+    "fields": {
+      "thing1": "summary",
+      "time2": "time"
+    }
+  },
+  "chat.message": {
+    "id": "",
+    "fields": {
+      "thing1": "summary",
+      "time2": "time"
+    }
+  },
+  "offer.created": {
+    "id": "",
+    "fields": {
+      "thing1": "event",
+      "date2": "time"
+    }
+  },
+  "offer.accepted": {
+    "id": "",
+    "fields": {
+      "thing1": "summary",
+      "time2": "time"
+    }
+  },
+  "trade.meetup": {
+    "id": "",
+    "fields": {
+      "thing1": "summary",
+      "time2": "time"
+    }
+  },
+  "moderation.result": {
+    "id": "",
+    "fields": {
+      "thing1": "summary",
+      "time2": "time"
+    }
+  }
+}

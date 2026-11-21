@@ -1,8 +1,10 @@
 // 云函数：商品（发布/搜索/详情/我的/状态流转/演示数据）
 // 对应需求：FR-P0-PUB-01 发布、FR-P0-SEA-01 搜索筛选、FR-P0-SEL-03 卖家择一状态机
 const cloud = require('wx-server-sdk');
+const {failure, quoteExpiryHours} = require('./lib/core');
+const {listingAction} = require('./lib/trade');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
-const db = cloud.database();
+const db = cloud.database({throwOnNotFound:false});
 const _ = db.command;
 
 exports.main = async (event) => {
@@ -15,10 +17,13 @@ exports.main = async (event) => {
     case 'search': return search(params);
     case 'detail': return detail(params);
     case 'myGoods': return myGoods(OPENID);
-    case 'offShelf': return setStatus(params, OPENID, 'off');
-    case 'relist': return setStatus(params, OPENID, 'on');
-    case 'complete': return complete(params, OPENID);
-    case 'remove': return removeGoods(params, OPENID);
+    case 'offShelf':
+    case 'relist':
+    case 'complete':
+    case 'remove':
+    case 'edit':
+      try { return await listingAction(db,{action,...params},OPENID,Date.now()); }
+      catch (error) { return failure(error,'商品操作失败'); }
     case 'seed': return seed();
     default: return { code: -1, msg: '未知操作' };
   }
@@ -54,6 +59,7 @@ async function publish(params, openid) {
       status: 'on',
       buyerId: '',
       dealPrice: null,
+      offerDurationHours: quoteExpiryHours(params.offerDurationHours),
       viewCount: 0,
       createdAt: now,
       updatedAt: now
@@ -76,7 +82,7 @@ async function publish(params, openid) {
     return { code: 0, data: { _id: addRes._id } };
   } catch (e) {
     console.error('publish error:', e);
-    return { code: -1, msg: '发布失败：' + e.message };
+    return failure(e,'发布失败');
   }
 }
 
@@ -125,44 +131,6 @@ async function detail(params) {
 async function myGoods(openid) {
   const res = await db.collection('goods').where({ sellerId: openid }).orderBy('createdAt', 'desc').limit(200).get();
   return { code: 0, data: res.data };
-}
-
-async function setStatus(params, openid, status) {
-  try {
-    const res = await db.collection('goods').doc(params.id).get();
-    if (!res.data || res.data.sellerId !== openid) return { code: -1, msg: '无权操作' };
-    await db.collection('goods').doc(params.id).update({ data: { status, updatedAt: Date.now() } });
-    return { code: 0, data: { status } };
-  } catch (e) {
-    return { code: -1, msg: '操作失败' };
-  }
-}
-
-// 删除自己发布的商品（锁定中的交易不允许删）
-async function removeGoods(params, openid) {
-  try {
-    const res = await db.collection('goods').doc(params.id).get();
-    const g = res.data;
-    if (!g || g.sellerId !== openid) return { code: -1, msg: '无权操作' };
-    if (g.status === 'locked') return { code: -1, msg: '交易锁定中，不能删除' };
-    await db.collection('goods').doc(params.id).remove();
-    return { code: 0, data: { removed: true } };
-  } catch (e) {
-    return { code: -1, msg: '删除失败' };
-  }
-}
-
-async function complete(params, openid) {
-  try {
-    const res = await db.collection('goods').doc(params.id).get();
-    const g = res.data;
-    if (!g || g.sellerId !== openid) return { code: -1, msg: '无权操作' };
-    if (g.status !== 'locked') return { code: -1, msg: '当前状态不可成交' };
-    await db.collection('goods').doc(params.id).update({ data: { status: 'sold', updatedAt: Date.now() } });
-    return { code: 0, data: { status: 'sold' } };
-  } catch (e) {
-    return { code: -1, msg: '操作失败' };
-  }
 }
 
 // 演示数据：方便测试版一键填充（sellerId 固定为 demo-seller，不会混入真实用户）

@@ -1,9 +1,10 @@
 // 云函数：会话与消息
 // 对应需求：FR-P0-CHT-01 会话、FR-P0-NOT-01 通知（成交锁定后互见联系方式）
 const cloud = require('wx-server-sdk');
-const crypto = require('crypto');
+const {failure, get, isParticipant, update} = require('./lib/core');
+const {chatOpen, chatSend} = require('./lib/trade');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
-const db = cloud.database();
+const db = cloud.database({throwOnNotFound:false});
 const _ = db.command;
 
 exports.main = async (event) => {
@@ -11,13 +12,15 @@ exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext();
   if (!OPENID) return { code: -1, msg: '未登录' };
 
-  switch (action) {
-    case 'conversations': return conversations(OPENID);
-    case 'open': return resolveConv(params, OPENID);
-    case 'messages': return messages(params, OPENID);
-    case 'send': return send(params, OPENID);
-    default: return { code: -1, msg: '未知操作' };
-  }
+  try {
+    switch (action) {
+      case 'conversations': return await conversations(OPENID);
+      case 'open': return await chatOpen(db,params,OPENID,Date.now());
+      case 'messages': return await messages(params,OPENID);
+      case 'send': return await chatSend(db,params,OPENID,Date.now());
+      default: return {code:-1,msg:'未知操作'};
+    }
+  } catch(error) { return failure(error,'会话操作失败'); }
 };
 
 async function getUser(openid) {
@@ -63,112 +66,25 @@ async function conversations(openid) {
   }
 }
 
-async function resolveConv(params, openid) {
-  try {
-    const gRes = await db.collection('goods').doc(params.goodsId).get();
-    const g = gRes.data;
-    if (!g) return { code: -1, msg: '商品不存在' };
-
-    const isSeller = g.sellerId === openid;
-    let buyerId;
-    if (isSeller) {
-      if (g.status !== 'locked' && g.status !== 'sold') return { code: -1, msg: '商品尚未锁定买家' };
-      if (!g.buyerId) return { code: -1, msg: '商品尚未锁定买家' };
-      buyerId = g.buyerId;
-    } else {
-      buyerId = openid;
-    }
-
-    const exist = await db.collection('conversations')
-      .where({ goodsId: g._id, sellerId: g.sellerId, buyerId }).get();
-    if (exist.data.length) return { code: 0, data: exist.data[0] };
-
-    const now = Date.now();
-    // 固定 _id：连点/并发调用也只会落一条会话
-    const convId = convDocId(g._id, buyerId);
-    const conv = {
-      _id: convId,
-      _openid: openid,
-      goodsId: g._id,
-      goodsTitle: g.title,
-      goodsCover: (g.images && g.images[0]) || '',
-      sellerId: g.sellerId,
-      buyerId,
-      lastMsg: '',
-      lastTime: now,
-      unreadSeller: 0,
-      unreadBuyer: 0,
-      updatedAt: now
-    };
-    try {
-      await db.collection('conversations').add({ data: conv });
-    } catch (e) {
-      // 并发时另一请求已按同一 _id 建好，回查复用
-      const again = await db.collection('conversations')
-        .where({ goodsId: g._id, sellerId: g.sellerId, buyerId }).get();
-      if (again.data.length) return { code: 0, data: again.data[0] };
-      throw e;
-    }
-    return { code: 0, data: conv };
-  } catch (e) {
-    console.error('resolveConv error:', e);
-    return { code: -1, msg: '发起会话失败' };
-  }
-}
-
 async function messages(params, openid) {
-  try {
-    const cRes = await db.collection('conversations').doc(params.conversationId).get();
-    const conv = cRes.data;
-    if (!conv || (conv.buyerId !== openid && conv.sellerId !== openid)) return { code: -1, msg: '无权查看' };
-
-    const isSeller = conv.sellerId === openid;
-    const otherId = isSeller ? conv.buyerId : conv.sellerId;
-    const other = await getUser(otherId);
-
-    const mRes = await db.collection('messages').where({ conversationId: conv._id }).orderBy('createdAt', 'asc').limit(200).get();
-
-    // 标记已读
-    const unreadField = isSeller ? 'unreadSeller' : 'unreadBuyer';
-    await db.collection('conversations').doc(conv._id).update({ data: { [unreadField]: 0 } });
-
-    // 成交锁定后才暴露对方联系方式
-    let contact = '';
-    try {
-      const g = await db.collection('goods').doc(conv.goodsId).get();
-      if (g.data && (g.data.status === 'locked' || g.data.status === 'sold')) contact = other.contact || '';
-    } catch (e) { /* ignore */ }
-
-    return { code: 0, data: { messages: mRes.data, other: { nickName: other.nickName, avatarUrl: other.avatarUrl, contact } } };
-  } catch (e) {
-    console.error('messages error:', e);
-    return { code: -1, msg: '加载失败' };
-  }
-}
-
-// 会话固定 _id：商品 + 买家 决定，保证幂等
-function convDocId(goodsId, buyerId) {
-  return 'c' + crypto.createHash('md5').update(goodsId + '_' + buyerId).digest('hex');
-}
-
-async function send(params, openid) {
-  try {
-    const cRes = await db.collection('conversations').doc(params.conversationId).get();
-    const conv = cRes.data;
-    if (!conv || (conv.buyerId !== openid && conv.sellerId !== openid)) return { code: -1, msg: '无权操作' };
-
-    const isSeller = conv.sellerId === openid;
-    const toId = isSeller ? conv.buyerId : conv.sellerId;
-    const now = Date.now();
-    await db.collection('messages').add({ data: { _openid: openid, conversationId: conv._id, fromId: openid, toId, content: params.content, createdAt: now } });
-
-    const unreadField = isSeller ? 'unreadBuyer' : 'unreadSeller';
-    await db.collection('conversations').doc(conv._id).update({
-      data: { lastMsg: params.content, lastTime: now, updatedAt: now, [unreadField]: _.inc(1) }
-    });
-    return { code: 0, data: { _id: conv._id } };
-  } catch (e) {
-    console.error('send error:', e);
-    return { code: -1, msg: '发送失败' };
-  }
+  const conv = await get(db,'conversations',params.conversationId);
+  if (!isParticipant(conv,openid)) return {code:-1,msg:'无权查看'};
+  const seller = conv.sellerId === openid;
+  const other = await getUser(seller?conv.buyerId:conv.sellerId);
+  const page = await db.collection('messages').where({conversationId:conv._id})
+    .orderBy('createdAt','desc').limit(200).get();
+  const unread = seller ? 'unreadSeller' : 'unreadBuyer';
+  await db.runTransaction(async tx => {
+    const current = await get(tx,'conversations',conv._id);
+    if (isParticipant(current,openid) && current.lastMessageId === conv.lastMessageId &&
+        current.lastTime === conv.lastTime && current[unread]) {
+      await update(tx,'conversations',conv._id,{[unread]:0});
+    }
+  });
+  const g = await get(db,'goods',conv.goodsId);
+  const contact = g?.status === 'locked' && g.buyerId === conv.buyerId ? other.contact || '' : '';
+  const canSend = !!g && g.enforcement !== 'removed' && g.moderationStatus !== 'rejected' &&
+    (g.status === 'on' || g.status === 'locked' && g.buyerId === conv.buyerId);
+  return {code:0,data:{messages:page.data.reverse(),other:{nickName:other.nickName || '校园用户',
+    avatarUrl:other.avatarUrl || '',contact},canSend,offerContext:{goodsId:conv.goodsId,tab:seller?'received':'sent'}}};
 }

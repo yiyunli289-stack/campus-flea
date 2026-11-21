@@ -74,6 +74,17 @@
       </view>
     </view>
 
+    <view class="note-row">
+      <text class="label">实物图（{{item.images.length}}/9）</text>
+      <view class="chips">
+        <view wx:for="{{item.images}}" wx:for-item="photoPath" wx:for-index="pi" wx:key="*this">
+          <image class="bk-cover" src="{{photoPath}}" mode="aspectFill" />
+          <view class="chip" bindtap="onRemovePhoto" data-i="{{bi}}" data-photo="{{pi}}">移除</view>
+        </view>
+        <view class="chip" wx:if="{{item.images.length < 9}}" bindtap="onChoosePhotos" data-i="{{bi}}">添加实物图</view>
+      </view>
+    </view>
+
     <view class="raw" wx:if="{{item.rawText}}">识别原文：{{item.rawText}}</view>
   </view>
 

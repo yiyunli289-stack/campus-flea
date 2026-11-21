@@ -1,17 +1,18 @@
 // 云函数：商品（发布/搜索/详情/我的/状态流转/演示数据）
-// 对应需求：FR-P0-PUB-01 发布、FR-P0-SEA-01 搜索筛选、FR-P0-SEL-03 卖家择一状态机
+// 对应需求：FR-P0-LST-05 重复发布提醒、FR-P0-SEA-01 搜索筛选、FR-P0-SEL-03 卖家择一状态机
 const cloud = require('wx-server-sdk');
+const { publishWithReminder, readCloudPhoto, publicListing } = require('./duplicate-publish');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
-const db = cloud.database();
+const db = cloud.database({ throwOnNotFound: false });
 const _ = db.command;
 
 exports.main = async (event) => {
   const { action, ...params } = event || {};
-  const { OPENID } = cloud.getWXContext();
+  const { OPENID, ENV } = cloud.getWXContext();
   if (!OPENID) return { code: -1, msg: '未登录' };
 
   switch (action) {
-    case 'publish': return publish(params, OPENID);
+    case 'publish': return publish(params, OPENID, ENV || process.env.TCB_ENV || process.env.SCF_NAMESPACE);
     case 'search': return search(params);
     case 'detail': return detail(params);
     case 'myGoods': return myGoods(OPENID);
@@ -29,35 +30,32 @@ async function getUser(openid) {
   return r.data[0] || {};
 }
 
-async function publish(params, openid) {
+async function publish(params, openid, env) {
   try {
     const user = await getUser(openid);
     if (!(user.nickName && user.campus && user.contact)) {
       return { code: -1, msg: '请先完善资料' };
     }
-    const now = Date.now();
+    if (typeof params.title !== 'string' || !params.title.trim() || typeof params.cat !== 'string' || !params.cat) {
+      return { code: -1, msg: '请填写商品标题和类目' };
+    }
     const data = {
       _openid: openid,
       sellerId: openid,
-      sellerName: user.nickName,
-      sellerAvatar: user.avatarUrl || '',
-      sellerCollege: user.college || '',
       cat: params.cat,
       tradeType: params.tradeType === '竞价' ? '竞价' : '定价',
       allowBargain: !!params.allowBargain,
-      title: params.title,
+      title: params.title.trim(),
       desc: params.desc || '',
       price: Number(params.price) || 0,
       condition: params.condition || '几乎全新',
       campus: params.campus || user.campus,
-      images: params.images || [],
-      status: 'on',
-      buyerId: '',
-      dealPrice: null,
-      viewCount: 0,
-      createdAt: now,
-      updatedAt: now
+      images: params.images || []
     };
+    for (const field of ['brand', 'model']) {
+      const value = params[field] || params.attributes?.[field];
+      if (typeof value === 'string' && value.trim()) data[field] = value.trim().slice(0, 100);
+    }
     if (params.cat === 'book') {
       Object.assign(data, {
         isbn: params.isbn || '',
@@ -72,11 +70,10 @@ async function publish(params, openid) {
         innerPhotos: params.innerPhotos || []
       });
     }
-    const addRes = await db.collection('goods').add({ data });
-    return { code: 0, data: { _id: addRes._id } };
+    return await publishWithReminder(db, user, data, params, env, file => readCloudPhoto(cloud, file));
   } catch (e) {
-    console.error('publish error:', e);
-    return { code: -1, msg: '发布失败：' + e.message };
+    console.error('publish error:', e.code || e.errCode || e.name);
+    return { code: -1, msg: '发布失败，请稍后重试' };
   }
 }
 
@@ -104,7 +101,7 @@ async function search(params) {
 
     const res = await db.collection('goods').where(where).orderBy('createdAt', 'desc')
       .skip(params.skip || 0).limit(50).get();
-    return { code: 0, data: res.data };
+    return { code: 0, data: res.data.map(publicListing) };
   } catch (e) {
     console.error('search error:', e);
     return { code: -1, msg: '搜索失败：' + e.message };
@@ -116,7 +113,7 @@ async function detail(params) {
     const res = await db.collection('goods').doc(params.id).get();
     if (!res.data) return { code: -1, msg: '商品不存在' };
     await db.collection('goods').doc(params.id).update({ data: { viewCount: _.inc(1) } });
-    return { code: 0, data: res.data };
+    return { code: 0, data: publicListing(res.data) };
   } catch (e) {
     return { code: -1, msg: '商品不存在' };
   }
@@ -124,7 +121,7 @@ async function detail(params) {
 
 async function myGoods(openid) {
   const res = await db.collection('goods').where({ sellerId: openid }).orderBy('createdAt', 'desc').limit(200).get();
-  return { code: 0, data: res.data };
+  return { code: 0, data: res.data.map(publicListing) };
 }
 
 async function setStatus(params, openid, status) {

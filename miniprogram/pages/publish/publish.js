@@ -1,6 +1,7 @@
 const app = getApp();
 const { CATEGORY_MAP, CONDITIONS, NOTE_LEVELS, CAMPUS_LIST } = require('../../utils/constants');
 const { ALL_COLLEGES } = require('../../utils/colleges');
+const {prepareAttempt, uploadPublishImages, submitGoods} = require('../../utils/publish-goods');
 
 Page({
   data: {
@@ -37,7 +38,11 @@ Page({
     this.setData({ cats, campus, campusIndex, collegeIndex });
 
     const draft = wx.getStorageSync('goodsDraft');
-    if (draft) this.setData(draft);
+    if (draft) {
+      const {publishAttempt, ...form} = draft;
+      this.publishAttempt = publishAttempt;
+      this.setData({...form, submitting:false});
+    }
   },
 
   goOcr() { wx.navigateTo({ url: '/pages/ocr/ocr' }); },
@@ -80,62 +85,53 @@ Page({
     this.setData({ innerPhotos: arr });
   },
 
+  storeDraft() {
+    wx.setStorageSync('goodsDraft', {...this.data, submitting:false, publishAttempt:this.publishAttempt});
+  },
+
   saveDraft() {
-    wx.setStorageSync('goodsDraft', this.data);
-    wx.showToast({ title: '草稿已保存', icon: 'success' });
+    this.storeDraft();
+    wx.showToast({title:'草稿已保存', icon:'success'});
   },
 
-  uploadFiles(paths, prefix) {
-    if (!paths.length) return Promise.resolve([]);
-    const openid = (app.globalData.userInfo && app.globalData.userInfo._openid) || 'u';
-    const tasks = paths.map((p, i) => wx.cloud.uploadFile({
-      cloudPath: prefix + '/' + openid + '/' + Date.now() + '-' + i + '.jpg',
-      filePath: p
-    }));
-    return Promise.all(tasks).then((res) => res.map((r) => r.fileID));
-  },
-
-  onPublish() {
-    if (this.data.submitting) return; // 防连点重复发布
+  async onPublish() {
+    if (this.data.submitting) return;
     const d = this.data;
-    if (!d.title.trim()) return wx.showToast({ title: '请填写标题', icon: 'none' });
+    if (!d.title.trim()) return wx.showToast({title:'请填写标题', icon:'none'});
     const price = Number(d.price);
-    if (!price || price <= 0) return wx.showToast({ title: '请填写有效价格', icon: 'none' });
+    if (!price || price <= 0) return wx.showToast({title:'请填写有效价格', icon:'none'});
 
-    app.ensureProfile().then(() => {
-      this.setData({ submitting: true });
-      wx.showLoading({ title: '发布中' });
-      Promise.all([
-        this.uploadFiles(d.images, 'goods-images'),
-        this.uploadFiles(d.innerPhotos, 'goods-inner')
-      ]).then(([images, innerPhotos]) => {
-        return app.call('goods', {
-          action: 'publish',
-          cat: d.cat,
-          tradeType: d.tradeType,
-          allowBargain: d.allowBargain,
-          title: d.title.trim(),
-          desc: d.desc,
-          price,
-          condition: d.condition,
-          campus: d.campus,
-          images,
-          isbn: d.isbn, author: d.author, publisher: d.publisher, edition: d.edition,
-          college: d.colleges[d.collegeIndex],
-          course: d.course,
-          noteLevel: d.noteLevel, noteDesc: d.noteDesc, defects: d.defects,
-          innerPhotos
-        });
-      }).then(() => {
-        wx.hideLoading();
+    const payload = {
+      cat:d.cat, tradeType:d.tradeType, allowBargain:d.allowBargain,
+      title:d.title.trim(), desc:d.desc, price, condition:d.condition, campus:d.campus,
+      images:d.images.slice(), innerPhotos:d.innerPhotos.slice(),
+      isbn:d.isbn, author:d.author, publisher:d.publisher, edition:d.edition,
+      college:d.colleges[d.collegeIndex], course:d.course,
+      noteLevel:d.noteLevel, noteDesc:d.noteDesc, defects:d.defects
+    };
+    this.setData({submitting:true});
+    try {
+      const user = await app.ensureProfile();
+      const attempt = prepareAttempt(this.publishAttempt, user._openid, payload);
+      this.publishAttempt = attempt;
+      this.storeDraft();
+      wx.showLoading({title:'发布中', mask:true});
+      await uploadPublishImages(attempt, user._openid, payload);
+      this.storeDraft();
+
+      if (await submitGoods(app, attempt)) {
+        this.publishAttempt = null;
         wx.removeStorageSync('goodsDraft');
-        wx.showToast({ title: '发布成功', icon: 'success' });
-        setTimeout(() => wx.switchTab({ url: '/pages/index/index' }), 800);
-      }).catch((err) => {
-        wx.hideLoading();
-        this.setData({ submitting: false });
-        wx.showToast({ title: err.message || '发布失败', icon: 'none' });
-      });
-    }).catch(() => {});
+        wx.showToast({title:'发布成功', icon:'success'});
+        wx.switchTab({url:'/pages/index/index'});
+      }
+    } catch (error) {
+      wx.hideLoading();
+      if (error.message !== '请先完善资料') {
+        wx.showToast({title:error.friendly || error.message || '发布失败', icon:'none'});
+      }
+    } finally {
+      this.setData({submitting:false});
+    }
   }
 });

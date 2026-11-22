@@ -2,8 +2,15 @@ const app = getApp();
 const { CATEGORY_MAP, CONDITIONS, TRADE_TYPES, CAMPUS_LIST } = require('../../utils/constants');
 const { ALL_COLLEGES } = require('../../utils/colleges');
 const { decorateGoods } = require('../../utils/format');
+const { withPageReload, reloadLatest } = require('../../utils/page-reload');
 
-Page({
+function isTemporaryNetworkError(err) {
+  if (!err || err.biz || err.friendly) return false;
+  return /timeout|timed out|网络超时|网络断开|网络连接失败|network (?:error|is (?:down|unreachable)|(?:connection )?(?:lost|disconnected))|(?:ENETDOWN|ENETUNREACH|ECONNRESET|ERR_INTERNET_DISCONNECTED)/i
+    .test(err.message || err.errMsg || '');
+}
+
+Page(withPageReload({
   data: {
     keyword: '',
     cats: [],
@@ -20,48 +27,48 @@ Page({
     priceMax: '',
     list: [],
     loading: false,
-    searched: false
+    searched: false,
+    loadError: ''
   },
 
   onLoad() {
-    this._seq = 0;
     const cats = [{ key: '', name: '全部' }].concat(
       Object.keys(CATEGORY_MAP).map((k) => ({ key: k, name: CATEGORY_MAP[k].name }))
     );
     this.setData({ cats });
   },
 
-  onShow() {
-    // 只有首次进入、或首页/学院页带筛选跳转时才重新查询；
-    // 从商品详情返回时保留原列表，不再打断/清空
-    const preset = this.applyPreset();
-    if (preset || !this.data.searched) this.search();
+  reload() {
+    this.applyPreset();
+    return this.search();
   },
 
-  onPullDownRefresh() {
-    this.search(true);
-  },
-
-  // 返回是否有预置筛选变化（搜索结果需要重查）
-  applyPreset() {
-    let changed = false;
-
-    const cat = wx.getStorageSync('searchCat');
-    if (cat) {
-      this.setData({ cat });
-      wx.removeStorageSync('searchCat');
-      changed = true;
+  async onPullDownRefresh() {
+    try {
+      await this.search();
+    } finally {
+      wx.stopPullDownRefresh();
     }
+  },
 
+  applyPreset() {
+    const cat = wx.getStorageSync('searchCat');
     const college = wx.getStorageSync('searchCollege');
+    if (!cat && !college) return;
+
+    const patch = {};
+    if (cat) {
+      patch.cat = cat;
+      if (cat !== 'book') patch.collegeIndex = 0;
+      wx.removeStorageSync('searchCat');
+    }
     if (college) {
       const pos = ALL_COLLEGES.indexOf(college);
-      this.setData({ cat: 'book', collegeIndex: pos >= 0 ? pos + 1 : 0 });
+      patch.cat = 'book';
+      patch.collegeIndex = pos + 1;
       wx.removeStorageSync('searchCollege');
-      changed = true;
     }
-
-    return changed;
+    this.setData(patch);
   },
 
   onKeyword(e) { this.setData({ keyword: e.detail.value }); },
@@ -72,40 +79,49 @@ Page({
     const patch = { cat };
     // 学院字段只有图书有，切到非图书类目时一并清掉，避免筛出空结果
     if (cat && cat !== 'book') patch.collegeIndex = 0;
-    this.setData(patch, () => this.search());
+    this.setData(patch);
+    return this.search();
   },
-  onCampus(e) { this.setData({ campusIndex: Number(e.detail.value) }, () => this.search()); },
+  onCampus(e) {
+    this.setData({ campusIndex: Number(e.detail.value) });
+    return this.search();
+  },
   onCollege(e) {
     const collegeIndex = Number(e.detail.value);
     const patch = { collegeIndex };
     // 选了具体学院，自动切到图书类目
     if (collegeIndex && this.data.cat !== 'book') patch.cat = 'book';
-    this.setData(patch, () => this.search());
+    this.setData(patch);
+    return this.search();
   },
-  onCond(e) { this.setData({ condIndex: Number(e.detail.value) }, () => this.search()); },
-  onTrade(e) { this.setData({ tradeIndex: Number(e.detail.value) }, () => this.search()); },
+  onCond(e) {
+    this.setData({ condIndex: Number(e.detail.value) });
+    return this.search();
+  },
+  onTrade(e) {
+    this.setData({ tradeIndex: Number(e.detail.value) });
+    return this.search();
+  },
   onMin(e) { this.setData({ priceMin: e.detail.value }); },
   onMax(e) { this.setData({ priceMax: e.detail.value }); },
 
-  doSearch() { this.search(); },
+  doSearch() { return this.search(); },
 
   reset() {
-    this.setData(
-      {
-        keyword: '',
-        cat: '',
-        campusIndex: 0,
-        collegeIndex: 0,
-        condIndex: 0,
-        tradeIndex: 0,
-        priceMin: '',
-        priceMax: ''
-      },
-      () => this.search()
-    );
+    this.setData({
+      keyword: '',
+      cat: '',
+      campusIndex: 0,
+      collegeIndex: 0,
+      condIndex: 0,
+      tradeIndex: 0,
+      priceMin: '',
+      priceMax: ''
+    });
+    return this.search();
   },
 
-  search(fromPull) {
+  searchParams() {
     const {
       keyword, cat, campusOptions, campusIndex,
       collegeOptions, collegeIndex,
@@ -124,28 +140,39 @@ Page({
     if (priceMin !== '' && !isNaN(Number(priceMin))) params.priceMin = Number(priceMin);
     if (priceMax !== '' && !isNaN(Number(priceMax))) params.priceMax = Number(priceMax);
 
-    // 请求序号：快速连点筛选时只认最后一次结果
-    const seq = ++this._seq;
-    this.setData({ loading: true, searched: true });
+    return params;
+  },
 
-    return app
-      .call('goods', params)
-      .then((list) => {
-        if (seq !== this._seq) return;
-        // 只有成功才替换列表，失败时保留上一次结果
-        this.setData({ list: decorateGoods(list), loading: false });
-      })
-      .catch((err) => {
-        if (seq !== this._seq) return;
-        this.setData({ loading: false });
-        wx.showToast({ title: (err && (err.friendly || err.message)) || '搜索失败', icon: 'none' });
-      })
-      .then(() => {
-        if (fromPull) wx.stopPullDownRefresh();
-      });
+  search() {
+    const params = this.searchParams();
+    const query = JSON.stringify(params);
+
+    return reloadLatest(this, async (isCurrent) => {
+      const first = !this._searchStarted;
+      this._searchStarted = true;
+      const patch = { loading: true, loadError: '' };
+      if (query !== this._loadedQuery) Object.assign(patch, { list: [], searched: false });
+      this.setData(patch);
+
+      try {
+        return await app.call('goods', params);
+      } catch (err) {
+        if (!first || !isCurrent() || !isTemporaryNetworkError(err)) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (!isCurrent() || query !== JSON.stringify(this.searchParams())) throw err;
+        return app.call('goods', params);
+      }
+    }, (list) => {
+      const items = decorateGoods(list);
+      this._loadedQuery = query;
+      this.setData({ list: items, loading: false, searched: true });
+    }, (err) => {
+      this.setData({ loading: false, loadError: '商品加载失败，请稍后重试' });
+      if (err && err.friendly) wx.showToast({ title: err.friendly, icon: 'none' });
+    });
   },
 
   goDetail(e) {
     wx.navigateTo({ url: '/pages/detail/detail?id=' + e.currentTarget.dataset.id });
   }
-});
+}));

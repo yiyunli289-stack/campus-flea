@@ -30,14 +30,21 @@ Page({
 
   onLoad() {
     const cats = Object.keys(CATEGORY_MAP).map((k) => ({ key: k, name: CATEGORY_MAP[k].name, icon: CATEGORY_MAP[k].icon }));
-    const user = app.globalData.userInfo || {};
-    const campus = user.campus || app.globalData.campus;
-    const campusIndex = Math.max(0, CAMPUS_LIST.indexOf(campus));
-    const collegeIndex = Math.max(0, ALL_COLLEGES.indexOf(user.college));
-    this.setData({ cats, campus, campusIndex, collegeIndex });
-
     const draft = wx.getStorageSync('goodsDraft');
-    if (draft) this.setData(draft);
+    this._campusEdited = !!draft;
+    this._collegeEdited = !!draft;
+    this.setData({ ...draft, cats, submitting: false });
+  },
+
+  onShow() {
+    const user = app.globalData.userInfo || {};
+    const patch = {};
+    if (!this._campusEdited) {
+      patch.campus = user.campus || app.globalData.campus;
+      patch.campusIndex = Math.max(0, CAMPUS_LIST.indexOf(patch.campus));
+    }
+    if (!this._collegeEdited) patch.collegeIndex = Math.max(0, ALL_COLLEGES.indexOf(user.college));
+    if (Object.keys(patch).length) this.setData(patch);
   },
 
   goOcr() { wx.navigateTo({ url: '/pages/ocr/ocr' }); },
@@ -47,9 +54,13 @@ Page({
   onBargain(e) { this.setData({ allowBargain: e.detail.value }); },
   onInput(e) { this.setData({ [e.currentTarget.dataset.field]: e.detail.value }); },
   onCondition(e) { const i = Number(e.detail.value); this.setData({ conditionIndex: i, condition: CONDITIONS[i] }); },
-  onCampus(e) { const i = Number(e.detail.value); this.setData({ campusIndex: i, campus: CAMPUS_LIST[i] }); },
+  onCampus(e) {
+    this._campusEdited = true;
+    const i = Number(e.detail.value);
+    this.setData({ campusIndex: i, campus: CAMPUS_LIST[i] });
+  },
   onNote(e) { const i = Number(e.detail.value); this.setData({ noteIndex: i, noteLevel: NOTE_LEVELS[i] }); },
-  onCollege(e) { this.setData({ collegeIndex: Number(e.detail.value) }); },
+  onCollege(e) { this._collegeEdited = true; this.setData({ collegeIndex: Number(e.detail.value) }); },
 
   chooseImages() {
     wx.chooseMedia({

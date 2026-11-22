@@ -50,11 +50,16 @@ App({
   },
 
   login() {
-    return this.call('login', { action: 'login' }).then((user) => {
+    // 页面切换期间共用登录请求，避免并发触发云端注册。
+    if (this._loginRequest) return this._loginRequest;
+    this._loginRequest = this.call('login', { action: 'login' }).then((user) => {
       this.globalData.userInfo = user;
       wx.setStorageSync('userInfo', user);
       return user;
+    }).finally(() => {
+      this._loginRequest = null;
     });
+    return this._loginRequest;
   },
 
   updateProfile(data) {
@@ -66,12 +71,12 @@ App({
   },
 
   // 确保已登录且资料补全，否则引导去资料页（发布/报价/聊天的前置门槛）
-  ensureProfile() {
+  ensureProfile(shouldPrompt = () => true) {
     const u = this.globalData.userInfo;
     if (u && u.profileComplete) return Promise.resolve(u);
     return this.login().then((user) => {
       if (!user.profileComplete) {
-        wx.navigateTo({ url: '/pages/profile/profile' });
+        if (shouldPrompt()) wx.navigateTo({ url: '/pages/profile/profile' });
         return Promise.reject(new Error('请先完善资料'));
       }
       return user;

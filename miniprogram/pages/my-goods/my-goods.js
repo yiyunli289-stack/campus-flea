@@ -1,23 +1,30 @@
 const app = getApp();
 const { decorateGoods, fmtTime } = require('../../utils/format');
+const { withPageReload, reloadLatest } = require('../../utils/page-reload');
 
-Page({
+Page(withPageReload({
   data: {
     list: [],
+    loading: false,
+    loadError: '',
     statusText: { on: '在售', locked: '已锁定', sold: '已成交', off: '已下架' }
   },
 
-  onShow() { this.load(); },
+  reload() {
+    return reloadLatest(this, async (isCurrent) => {
+      const cached = app.globalData.userInfo;
+      const patch = { loading: true, loadError: '' };
+      if (!cached || !cached.profileComplete || this._listOwner !== cached._openid) patch.list = [];
+      this.setData(patch);
 
-  load() {
-    app.ensureProfile().then(() => {
-      app.call('goods', { action: 'myGoods' })
-        .then((list) => {
-          const items = decorateGoods(list).map((g) => ({ ...g, timeText: fmtTime(g.createdAt) }));
-          this.setData({ list: items });
-        })
-        .catch(() => this.setData({ list: [] }));
-    }).catch(() => this.setData({ list: [] }));
+      const user = await app.ensureProfile(isCurrent);
+      if (!isCurrent()) return;
+      this._listOwner = user._openid;
+      return app.call('goods', { action: 'myGoods' });
+    }, (list) => {
+      const items = decorateGoods(list).map((g) => ({ ...g, timeText: fmtTime(g.createdAt) }));
+      this.setData({ list: items, loading: false });
+    }, (err) => this.setData({ loading: false, loadError: err.message || '商品加载失败' }));
   },
 
   goDetail(e) { wx.navigateTo({ url: '/pages/detail/detail?id=' + e.currentTarget.dataset.id }); },
@@ -26,13 +33,13 @@ Page({
 
   onOffShelf(e) {
     app.call('goods', { action: 'offShelf', id: e.currentTarget.dataset.id })
-      .then(() => this.load())
+      .then(() => this.reload())
       .catch((err) => wx.showToast({ title: err.message, icon: 'none' }));
   },
 
   onRelist(e) {
     app.call('goods', { action: 'relist', id: e.currentTarget.dataset.id })
-      .then(() => this.load())
+      .then(() => this.reload())
       .catch((err) => wx.showToast({ title: err.message, icon: 'none' }));
   },
 
@@ -44,7 +51,7 @@ Page({
       success: (r) => {
         if (!r.confirm) return;
         app.call('goods', { action: 'remove', id: e.currentTarget.dataset.id })
-          .then(() => this.load())
+          .then(() => this.reload())
           .catch((err) => wx.showToast({ title: err.message, icon: 'none' }));
       }
     });
@@ -57,10 +64,10 @@ Page({
       success: (r) => {
         if (r.confirm) {
           app.call('goods', { action: 'complete', id: e.currentTarget.dataset.id })
-            .then(() => this.load())
+            .then(() => this.reload())
             .catch((err) => wx.showToast({ title: err.message, icon: 'none' }));
         }
       }
     });
   }
-});
+}));

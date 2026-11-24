@@ -1,7 +1,8 @@
 <safety-tip />
-<view class="page">
+<view class="page" wx:if="{{restriction}}"><view class="card section">{{restriction}}<view class="btn-ghost" bindtap="onSafety">打开安全中心</view></view></view>
+<view class="page" wx:else>
   <!-- 批量录入入口 -->
-  <view class="batch-entry card" bindtap="goOcr">
+  <view class="batch-entry card" wx:if="{{!editorId}}" bindtap="goOcr">
     <text class="be-icon">📚</text>
     <view class="be-main">
       <view class="be-title">批量录入图书</view>
@@ -9,6 +10,8 @@
     </view>
     <text class="be-arrow">›</text>
   </view>
+
+  <view class="section card" wx:if="{{editorId}}"><text>{{editorStatus === 'on' ? '编辑在售商品' : '编辑草稿'}}</text><view class="btn-ghost" bindtap="cancelEdit">退出编辑</view></view>
 
   <!-- 类目 -->
   <view class="section card">
@@ -26,7 +29,7 @@
     <view class="sec-title">商品图片（{{images.length}}/9）</view>
     <view class="img-list">
       <view class="img-item" wx:for="{{images}}" wx:key="*this">
-        <image class="img" src="{{item}}" mode="aspectFill" />
+        <image class="img" src="{{previews[item] || item}}" mode="aspectFill" />
         <view class="img-del" catchtap="removeImage" data-i="{{index}}">×</view>
       </view>
       <view class="img-add" bindtap="chooseImages">＋</view>
@@ -69,6 +72,7 @@
         <view class="picker-val">{{campus}} ›</view>
       </picker>
     </view>
+    <view class="field"><text class="label">报价有效期（小时）</text><input class="input" type="number" value="{{offerDurationHours}}" data-field="offerDurationHours" bindinput="onInput" /></view>
     <view class="field field-area">
       <text class="label">描述</text>
       <textarea class="textarea" placeholder="成色、使用情况、转手原因…" value="{{desc}}" data-field="desc" bindinput="onInput" />
@@ -102,7 +106,7 @@
       <text class="label">内页照片</text>
       <view class="img-list">
         <view class="img-item" wx:for="{{innerPhotos}}" wx:key="*this">
-          <image class="img" src="{{item}}" mode="aspectFill" />
+          <image class="img" src="{{previews[item] || item}}" mode="aspectFill" />
           <view class="img-del" catchtap="removeInner" data-i="{{index}}">×</view>
         </view>
         <view class="img-add" bindtap="chooseInner">＋</view>
@@ -111,7 +115,7 @@
   </view>
 
   <view class="btn-row">
-    <view class="btn-ghost half" bindtap="saveDraft">存草稿</view>
-    <view class="btn-brand half" bindtap="onPublish">{{submitting ? '发布中…' : '发布'}}</view>
+    <view class="btn-ghost half" wx:if="{{editorStatus !== 'on'}}" bindtap="saveDraft">存草稿</view>
+    <view class="btn-brand half" bindtap="onPublish">{{submitting ? '保存中…' : editorStatus === 'on' ? '保存修改' : '发布'}}</view>
   </view>
 </view>

@@ -2,6 +2,7 @@
 const crypto = require('node:crypto');
 const { Auth } = require('./auth');
 const { assert, id, hash, mask, text, Fault, canonical } = require('./core');
+const trade = require('./trade-state');
 const { defaultConfig, defaultRules, rentalRestrictions } = require('./defaults');
 
 function reportStateFilter(state) {
@@ -46,16 +47,25 @@ class Service {
     if (key==='public' && !s.content.rentalRestrictions) s.content.rentalRestrictions=structuredClone(rentalRestrictions);
     return s;
   }
+  async findUser(openid, tx = this.store) {
+    if (!openid) return null;
+    const rows = await this.store.find('users', { _openid: openid }, { limit: 50 });
+    const key = rows.find(u => u.accountStatus === 'deleted')?._id
+      || rows.find(u => u.accountStatus === 'banned')?._id
+      || rows.find(u => u.accountStatus === 'restricted')?._id
+      || rows.find(u => u.accessEpoch)?._id
+      || rows.find(u => u._id === hash('user:' + openid))?._id || rows[0]?._id;
+    return key ? tx.get('users', key) : null;
+  }
   async user(openid, capability, tx = this.store, requireProfile = true) {
     assert(openid, 'UNAUTHENTICATED', '请先登录', 401);
-    const users = tx === this.store ? await tx.find('users', { _openid: openid }, { limit: 1 }) : [];
-    const key = users[0]?._id || (await this.store.find('users',{ _openid: openid },{limit:1}))[0]?._id;
-    const u = key ? await tx.get('users', key) : null;
+    const u = await this.findUser(openid, tx);
     assert(u, 'PROFILE_REQUIRED', '请先登录并完善资料', 403);
     if (capability) {
-      assert(u.accountStatus !== 'banned' && u.accountStatus !== 'deleted', 'ACCOUNT_BANNED', '账号已封禁，请查看治理通知', 403);
-      const restricted = u.accountStatus === 'restricted' && (!u.restrictedUntil || u.restrictedUntil > this.now()) && (u.restrictions || []).includes(capability);
-      assert(!restricted, 'ACCOUNT_RESTRICTED', '账号当前不能执行此操作', 403);
+      assert(u.accountStatus !== 'deleted', 'ACCOUNT_DELETED', '账号已注销', 403);
+      assert(u.accountStatus !== 'banned', 'ACCOUNT_BANNED', '账号已封禁，请查看治理通知', 403);
+      assert(trade.accountState(u, this.now()).allowedCapabilities.includes(capability),
+        'ACCOUNT_RESTRICTED', '账号当前不能执行此操作', 403);
       if (requireProfile) assert(u.profileComplete && u.nickName && u.contact && u.campus, 'PROFILE_REQUIRED', '请先完善资料', 403);
     }
     return u;
@@ -64,19 +74,34 @@ class Service {
     return !!((await tx.get('userBlocks', hash(a + ':' + b)))?.active || (await tx.get('userBlocks', hash(b + ':' + a)))?.active);
   }
   async guardPair(a, b, tx = this.store) { assert(!await this.blocked(a,b,tx), 'USER_BLOCKED', '拉黑关系存在，无法报价或发送消息', 403); }
+  async listingState(g, tx = this.store) {
+    const { seller, buyer } = await trade.parties(this, g, g?.buyerId, tx);
+    return trade.listingState(g, seller, buyer);
+  }
   async visible(g, tx = this.store) {
-    if (!g || g.moderationStatus !== 'approved' || g.enforcement === 'removed') return false;
-    const owner = await this.user(g.sellerId, null, tx, false).catch(e => { if (e.code === 'PROFILE_REQUIRED') return null; throw e; });
-    return !!owner && owner.accountStatus !== 'banned' && owner.accountStatus !== 'deleted';
+    return ['on', 'locked', 'off', 'sold'].includes(await this.listingState(g, tx)) &&
+      !trade.blockedAccount(await this.findUser(g.sellerId, tx));
+  }
+  async chatAvailable(c, g, tx = this.store) {
+    const { seller, buyer } = await trade.parties(this, g, c?.buyerId, tx);
+    return trade.livePair(g, c, seller, buyer, this.now(), 'message') &&
+      !await this.blocked(c.sellerId, c.buyerId, tx);
+  }
+  async contactAvailable(c, g, seller, buyer, tx = this.store) {
+    if (!trade.livePair(g, c, seller, buyer, this.now(), 'offer') ||
+        !trade.livePair(g, c, seller, buyer, this.now(), 'message') ||
+        ![seller, buyer].every(u => trade.accountState(u, this.now()).accountStatus === 'normal') ||
+        await this.blocked(c.sellerId, c.buyerId, tx)) return false;
+    return g.status === 'locked' || !!(c.contactConsent?.seller && c.contactConsent?.buyer);
   }
   async notify(tx, ownerId, type, targetId, content) {
     const key = hash(ownerId + ':' + type + ':' + targetId);
     if (!await tx.get('notifications', key)) await tx.put('notifications', key, { ownerId, type, targetId, content, read: false, createdAt: this.now() });
   }
-  async enqueue(tx, kind, targetId, data = {}) {
+  async enqueue(tx, kind, targetId, data = {}, runAt) {
     const key = hash(kind + ':' + targetId);
     const now = this.now();
-    if (!await tx.get('outboxTasks', key)) await tx.put('outboxTasks', key, { kind, targetId, data: { createdAt: now, ...data }, state: 'pending', attempts: 0, nextAt: now, createdAt: now });
+    if (!await tx.get('outboxTasks', key)) await tx.put('outboxTasks', key, { kind, targetId, data: { createdAt: now, ...data }, state: 'pending', attempts: 0, nextAt: runAt || now, createdAt: now });
   }
   async risk(openid, type, targetId, facts, action = 'review') {
     const key = id();
@@ -97,9 +122,9 @@ class Service {
     if (copy.avatarUrl?.startsWith('cloud://')) copy.avatarUrl = (await this.provider.urls([copy.avatarUrl]))[0];
     if (copy.sellerAvatar?.startsWith('cloud://')) copy.sellerAvatar = (await this.provider.urls([copy.sellerAvatar]))[0];
     if(copy.sellerId) {
-      const seller=await this.user(copy.sellerId,null,this.store,false);
-      copy.sellerName=seller.moderationStatus==='approved'?seller.nickName:'校园用户';
-      if(seller.moderationStatus!=='approved') copy.sellerAvatar='';
+      const seller=await this.findUser(copy.sellerId) || {};
+      copy.sellerName=(!seller.moderationStatus || seller.moderationStatus==='approved') && !trade.blockedAccount(seller) ? seller.nickName : '校园用户';
+      if(copy.sellerName==='校园用户') copy.sellerAvatar='';
     }
     return copy;
   }

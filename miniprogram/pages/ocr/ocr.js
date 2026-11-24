@@ -7,6 +7,12 @@ require('../../utils/page')({
     processing: false
   },
 
+  onShow() {
+    app.refreshAccount()
+      .then(user => this.setData({restriction:app.capabilityError(user,'publish')?.message || ''}))
+      .catch(error => this.setData({restriction:error.message}));
+  },
+
   chooseImages() {
     wx.chooseMedia({
       count: 3 - this.data.images.length,
@@ -59,7 +65,7 @@ require('../../utils/page')({
     if (!this.data.images.length) {
       return wx.showToast({ title: '请先选择书脊照片', icon: 'none' });
     }
-    app.ensureProfile().then(async () => {
+    app.ensureProfile('publish').then(async () => {
       this.setData({ processing: true });
       wx.showLoading({ title: '识别中', mask: true });
       const openid = (app.globalData.userInfo && app.globalData.userInfo._openid) || 'u';

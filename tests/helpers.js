@@ -3,7 +3,7 @@ const {MemoryStore}=require('../shared/server/store');const {Service}=require('.
 const {hash}=require('../shared/server/core');
 async function fixture(options={}) {
   let now=1800000000000;
-  const provider={text:async()=>({status:'approved'}),image:async()=>({status:'approved',traceId:'trace-test'}),urls:async files=>files.map(f=>'https://files.example/'+encodeURIComponent(f)),inspect:async()=>({bytes:100,image:true,hash:'image'}),...options.provider};
+  const provider={text:async()=>({status:'approved'}),image:async()=>({status:'approved',traceId:'trace-test'}),urls:async files=>files.map(f=>'https://files.example/'+encodeURIComponent(f)),uploadTicket:async cloudPath=>({fileID:'cloud://env/'+cloudPath}),freeze:async cloudPath=>'cloud://env/'+cloudPath,inspect:async()=>({bytes:100,image:true,hash:'image',extension:'.jpg'}),...options.provider};
   const store=new MemoryStore();const env={AUDIT_SECRET:'a'.repeat(48),ADMIN_ORIGIN:'http://localhost:5173',NODE_ENV:'test',CALLBACK_TOKEN:'callback-token-123456',...options.env};
   const s=new Service(store,provider,env,()=>now);await s.initialize(['计算机学院']);
   for(const who of ['seller','buyer','other']) await store.put('users',who,{_id:who,_openid:who,nickName:who,campus:'江安校区',contact:'contact-'+who,college:'计算机学院',avatarUrl:'',profileComplete:true,accountStatus:'normal',createdAt:now});

@@ -1,3 +1,5 @@
+<view class="card" wx:if="{{restriction}}">{{restriction}}</view>
+<block wx:else>
 <view class="page">
   <view class="form card">
     <view class="form-title">完善个人资料</view>
@@ -5,7 +7,7 @@
 
     <!-- 头像 -->
     <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
-      <image wx:if="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" />
+      <image wx:if="{{avatarPreview}}" class="avatar-img" src="{{avatarPreview}}" />
       <view wx:else class="avatar-img avatar-empty">👤</view>
       <text class="avatar-tip">点击选择头像</text>
     </button>
@@ -42,3 +44,5 @@
 
   <view class="btn-brand save-btn" bindtap="onSave">保存</view>
 </view>
+
+</block>

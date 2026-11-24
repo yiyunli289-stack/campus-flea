@@ -8,7 +8,9 @@ for(const name of functions) {
   pkg.overrides = { 'wx-server-sdk': { '@cloudbase/node-sdk': '$@cloudbase/node-sdk' }, axios: '^1.21.1' };
   fs.writeFileSync(path.join(dir,'package.json'),JSON.stringify(pkg,null,2)+'\n');
   const configFile=path.join(dir,'config.json');const config=fs.existsSync(configFile)?JSON.parse(fs.readFileSync(configFile,'utf8')):{};
-  const apis={login:['security.msgSecCheck','security.mediaCheckAsync'],goods:['security.msgSecCheck','security.mediaCheckAsync'],offer:['security.msgSecCheck'],chat:['security.msgSecCheck'],ocr:['ocr.printedText']}[name];
-  if(apis){config.permissions={...(config.permissions||{}),openapi:apis};fs.writeFileSync(configFile,JSON.stringify(config,null,2)+'\n');}
+  const apis={login:['security.msgSecCheck','security.mediaCheckAsync'],goods:['security.msgSecCheck','security.mediaCheckAsync'],offer:['security.msgSecCheck'],chat:['security.msgSecCheck'],'governance-worker':['security.msgSecCheck','security.mediaCheckAsync'],ocr:['ocr.printedText']}[name];
+  if (apis) config.permissions = {...config.permissions,openapi:apis};
+  if (name === 'governance-worker') config.timeout = 120;
+  if (apis || name === 'governance-worker') fs.writeFileSync(configFile,JSON.stringify(config,null,2)+'\n');
 }
 console.log('已打包11个云函数；lib 为生成文件，请先运行此脚本再上传部署。');

@@ -14,25 +14,29 @@ require('../../utils/page')({
     contact: ''
   },
 
-  onLoad() {
+  async onLoad() {
+    try { await app.refreshAccount() || await app.login(); } catch (error) { app.showActionError(error); }
     const user = app.globalData.userInfo || {};
     const campusList = app.globalData.campusList;
     const campusIndex = Math.max(0, campusList.indexOf(user.campus));
     const collegeIndex = Math.max(0, ALL_COLLEGES.indexOf(user.college));
     this.setData({
       nickName: user.nickName || '',
-      avatarUrl: user.avatarUrl || '',
+      avatarUrl: user.avatarUrl || '',avatarPreview:user.avatarPreview || '',
       campusList,
       campusIndex,
       collegeIndex,
       college: user.college || ALL_COLLEGES[0],
       major: user.major || '',
-      contact: user.contact || ''
+      contact: user.contact || '',
+      restriction: app.capabilityError(user,'profile')?.message || ''
     });
   },
 
+  onShow() { app.refreshAccount().then(user => this.setData({restriction:app.capabilityError(user,'profile')?.message || ''})).catch(app.showActionError); },
+
   onChooseAvatar(e) {
-    this.setData({ avatarUrl: e.detail.avatarUrl });
+    this.setData({ avatarUrl: e.detail.avatarUrl, avatarPreview:e.detail.avatarUrl });
   },
 
   onNickName(e) { this.setData({ nickName: e.detail.value }); },
@@ -44,7 +48,8 @@ require('../../utils/page')({
   onMajor(e) { this.setData({ major: e.detail.value }); },
   onContact(e) { this.setData({ contact: e.detail.value }); },
 
-  onSave() {
+  async onSave() {
+    try { await app.ensureProfile('profile'); } catch (error) { app.showActionError(error); return; }
     const { nickName, avatarUrl, campusList, campusIndex, college, major, contact } = this.data;
     const campus = campusList[campusIndex];
 
@@ -53,7 +58,7 @@ require('../../utils/page')({
     if (!contact.trim()) return wx.showToast({ title: '请填写联系方式', icon: 'none' });
 
     wx.showLoading({ title: '保存中' });
-    Promise.resolve(avatarUrl && !avatarUrl.startsWith('cloud://') ? app.uploadFile(avatarUrl).then(r => r.fileID) : avatarUrl).then(savedAvatar => app.updateProfile({ nickName: nickName.trim(), avatarUrl: savedAvatar, campus, college, major: major.trim(), contact: contact.trim() }))
+    Promise.resolve(avatarUrl && avatarUrl !== app.globalData.userInfo?.avatarUrl && !avatarUrl.startsWith('cloud://') ? app.uploadFile(avatarUrl).then(r => r.fileID) : avatarUrl).then(savedAvatar => app.updateProfile({ nickName: nickName.trim(), avatarUrl: savedAvatar, campus, college, major: major.trim(), contact: contact.trim() }))
       .then(() => {
         wx.hideLoading();
         wx.showToast({ title: '资料已提交审核', icon: 'success' });

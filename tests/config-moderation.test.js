@@ -23,12 +23,15 @@ test('图书照片约束与上传凭证：不接受外部URL、其他用户文�
   await assert.rejects(f.s.mini('governance',{action:'registerMedia',id:ticket.id,fileID:'cloud://env/'+ticket.cloudPath},'other'),e=>e.code==='FORBIDDEN');
   const media=await f.s.mini('governance',{action:'registerMedia',id:ticket.id,fileID:'cloud://env/'+ticket.cloudPath},'buyer');assert(media.fileID);
 });
-test('图片回调前不公开，重复回调不重复通知，旧版本不能放行新内容',async()=>{
-  const f=await fixture({provider:{image:async()=>({status:'pending',traceId:'trace-pending'})}});const goodsId=await f.listing();assert.equal((await f.s.mini('goods',{action:'search'},'buyer')).length,0);
+test('待图片审核仍公开，重复回调幂等，旧结果不能处置新版本',async()=>{
+  const f=await fixture({provider:{image:async()=>({status:'pending',traceId:'trace-pending'})}});const goodsId=await f.listing();assert.equal((await f.s.mini('goods',{action:'search'},'buyer')).length,1);
+  await runWorker(f.s);
   await imageCallback(f.s,'trace-pending',true);await imageCallback(f.s,'trace-pending',true);assert.equal((await f.s.mini('goods',{action:'search'},'buyer')).length,1);
   assert.equal((await f.store.find('notifications',{ownerId:'seller'})).length,1);
-  f.provider.image=async()=>({status:'pending',traceId:'trace-new'});const second=await f.listing();const g=await f.store.get('goods',second);await f.store.put('goods',second,{...g,contentVersion:'new-version',moderationStatus:'review'});
-  await imageCallback(f.s,'trace-new',true);assert.equal((await f.store.get('goods',second)).moderationStatus,'review');
+  f.provider.image=async()=>({status:'pending',traceId:'trace-new'});const second=await f.listing();await runWorker(f.s);
+  await f.s.mini('goods',{action:'edit',id:second,title:'新的商品标题'},'seller');
+  await imageCallback(f.s,'trace-new',false);assert.equal((await f.store.get('goods',second)).moderationStatus,'review');
+  assert.equal((await f.s.mini('goods',{action:'detail',id:second},'buyer')).title,'新的商品标题');
 });
 test('早到图片回调持久化，后续任务登记后自动补偿',async()=>{
   const f=await fixture({provider:{image:async()=>({status:'pending',traceId:'early-trace'})}});

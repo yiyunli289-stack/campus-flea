@@ -1,7 +1,7 @@
 const app = getApp();
 const { fmtTime, fmtPrice } = require('../../utils/format');
 
-const ST = { pending: '待处理', accepted: '已锁定', rejected: '未选中', cancelled: '已取消', closed: '已关闭', completed: '已结束' };
+const ST = { pending: '待处理', accepted: '已锁定', rejected: '未选中', cancelled: '已取消', closed: '已关闭', completed: '已结束', expired: '已到期' };
 
 require('../../utils/page')({
   data: { tab: 'received', received: [], sent: [] },
@@ -10,7 +10,7 @@ require('../../utils/page')({
   onShow() { this.load(); },
 
   load() {
-    app.ensureProfile().then(() => {
+    app.login().then(() => {
       app.call('offer', { action: 'received', goodsId: this.goodsId })
         .then((list) => this.setData({ received: this.deco(list) }))
         .catch(() => this.setData({ received: [] }));
@@ -64,6 +64,17 @@ require('../../utils/page')({
         } catch (err) { wx.showToast({ title:err.message, icon:'none' }); }
       }
     });
+  },
+
+  onMeetup(e) {
+    const { action,id } = e.currentTarget.dataset;
+    wx.showModal({title:action==='restoreListing'?'恢复在售？':'确认面交安排？',success:async result => {
+      if (!result.confirm) return;
+      try {
+        await app.call('offer',{action,offerId:id});
+        this.load();
+      } catch (error) { app.showActionError(error); }
+    }});
   },
 
   onReportOffer(e) { require('../../utils/governance').report('offers', e.currentTarget.dataset.id); },

@@ -1,3 +1,5 @@
+<view class="card" wx:if="{{restriction}}">{{restriction}}</view>
+<block wx:else>
 <view class="page">
   <view class="intro">
     <view class="intro-title">批量录入图书</view>
@@ -28,3 +30,5 @@
     <view class="btn-brand recog-btn" bindtap="scanIsbn">开始扫码</view>
   </view>
 </view>
+
+</block>

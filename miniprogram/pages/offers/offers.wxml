@@ -18,10 +18,12 @@
       <view class="o-status st-{{item.status}}">{{item.statusText}}</view>
       <view class="o-contact" wx:if="{{item.status === 'accepted' && item.buyerContact}}">买家联系：{{item.buyerContact}}</view>
       <view class="o-actions"><view class="o-btn" bindtap="onReportOffer" data-id="{{item._id}}">举报留言</view>
-        <view class="o-btn primary" wx:if="{{item.status === 'pending'}}" bindtap="onAccept" data-id="{{item._id}}">接受此报价</view>
-        <view class="o-btn" wx:if="{{item.status === 'pending'}}" bindtap="onTradeDecision" data-action="decline" data-id="{{item._id}}">拒绝</view>
-        <view class="o-btn" wx:if="{{item.status === 'accepted'}}" bindtap="onTradeDecision" data-action="cancelLock" data-id="{{item._id}}">取消锁定</view>
-        <view class="o-btn" wx:if="{{item.status === 'accepted'}}" bindtap="onChat" data-goods-id="{{item.goodsId}}">去聊天</view>
+        <view class="o-btn primary" wx:if="{{item.canAccept}}" bindtap="onAccept" data-id="{{item._id}}">接受此报价</view>
+        <view class="o-btn" wx:if="{{item.canManage && item.status === 'pending'}}" bindtap="onTradeDecision" data-action="decline" data-id="{{item._id}}">拒绝</view>
+        <view class="o-btn" wx:if="{{item.canManage && item.status === 'accepted'}}" bindtap="onTradeDecision" data-action="cancelLock" data-id="{{item._id}}">取消锁定</view>
+        <view class="o-btn" wx:if="{{item.canManage && item.status === 'accepted'}}" bindtap="onMeetup" data-action="confirmMeetup" data-id="{{item._id}}">确认面交</view>
+        <view class="o-btn" wx:if="{{item.canRestore}}" bindtap="onMeetup" data-action="restoreListing" data-id="{{item._id}}">恢复在售</view>
+        <view class="o-btn" wx:if="{{item.canChat && item.status === 'accepted'}}" bindtap="onChat" data-goods-id="{{item.goodsId}}">去聊天</view>
       </view>
     </view>
   </block>
@@ -37,9 +39,11 @@
       <view class="o-status st-{{item.status}}">{{item.statusText}}</view>
       <view class="o-contact" wx:if="{{item.status === 'accepted' && item.sellerContact}}">卖家联系：{{item.sellerContact}}</view>
       <view class="o-actions">
-        <view class="o-btn" wx:if="{{item.status === 'pending' && item.tradeType === '竞价'}}" bindtap="onUpdate" data-id="{{item._id}}">修改竞价</view><view class="o-btn" wx:if="{{item.status === 'pending'}}" bindtap="onCancel" data-id="{{item._id}}">取消报价</view>
-        <view class="o-btn" wx:if="{{item.status === 'accepted'}}" bindtap="onTradeDecision" data-action="cancelLock" data-id="{{item._id}}">取消锁定</view>
-        <view class="o-btn" wx:if="{{item.status === 'accepted'}}" bindtap="onChat" data-goods-id="{{item.goodsId}}">去聊天</view>
+        <view class="o-btn" wx:if="{{item.canManage && item.status === 'pending' && item.tradeType === '竞价'}}" bindtap="onUpdate" data-id="{{item._id}}">修改竞价</view><view class="o-btn" wx:if="{{item.canManage && item.status === 'pending'}}" bindtap="onCancel" data-id="{{item._id}}">取消报价</view>
+        <view class="o-btn" wx:if="{{item.canManage && item.status === 'accepted'}}" bindtap="onTradeDecision" data-action="cancelLock" data-id="{{item._id}}">取消锁定</view>
+        <view class="o-btn" wx:if="{{item.canManage && item.status === 'accepted'}}" bindtap="onMeetup" data-action="confirmMeetup" data-id="{{item._id}}">确认面交</view>
+        <view class="o-btn" wx:if="{{item.canRestore}}" bindtap="onMeetup" data-action="restoreListing" data-id="{{item._id}}">恢复在售</view>
+        <view class="o-btn" wx:if="{{item.canChat && item.status === 'accepted'}}" bindtap="onChat" data-goods-id="{{item.goodsId}}">去聊天</view>
       </view>
     </view>
   </block>

@@ -5,5 +5,12 @@
       "type": "timer",
       "config": "0 * * * * * *"
     }
-  ]
+  ],
+  "permissions": {
+    "openapi": [
+      "security.msgSecCheck",
+      "security.mediaCheckAsync"
+    ]
+  },
+  "timeout": 120
 }

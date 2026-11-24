@@ -11,7 +11,7 @@ function matches(doc, filter) {
     const actual = doc[key];
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       return Object.entries(value).every(([op, x]) => ({ $in: () => x.includes(actual), $ne: () => actual !== x,
-        $gte: () => actual >= x, $lte: () => actual <= x, $exists: () => Object.hasOwn(doc, key) === x,
+        $gt: () => actual > x, $gte: () => actual >= x, $lte: () => actual <= x, $exists: () => Object.hasOwn(doc, key) === x,
         $contains: () => String(actual || '').toLowerCase().includes(String(x).toLowerCase()) }[op]?.() || false));
     }
     return actual === value;
@@ -54,7 +54,7 @@ class CloudStore {
       if (v && typeof v === 'object' && !Array.isArray(v)) {
         let expr;
         for (const [op, x] of Object.entries(v)) {
-          const next = op === '$contains' ? this.base.RegExp({ regexp: String(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), options: 'i' }) : cmd[({ $in: 'in', $ne: 'neq', $gte: 'gte', $lte: 'lte', $exists: 'exists' })[op]](x);
+          const next = op === '$contains' ? this.base.RegExp({ regexp: String(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), options: 'i' }) : cmd[({ $in: 'in', $ne: 'neq', $gt: 'gt', $gte: 'gte', $lte: 'lte', $exists: 'exists' })[op]](x);
           expr = expr ? cmd.and(expr, next) : next;
         }
         out[k] = expr;

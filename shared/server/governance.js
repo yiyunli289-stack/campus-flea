@@ -2,13 +2,18 @@
 const { assert, id, hash, text, confirm, permit, publicAdmin } = require('./core');
 const { mediaTicket, registerMedia, applyResult } = require('./moderation');
 const { saveVersion, publishVersion } = require('./config');
+const trade = require('./trade-state');
 
 async function targetForReport(s,type,key,openid) {
   assert(['goods','users','offers','messages'].includes(type),'INVALID_INPUT','举报对象无效');
+  assert(typeof key === 'string' && key.length > 0 && key.length <= 128, 'INVALID_INPUT','举报对象无效');
   let target=await s.store.get(type,key);
   if(type==='users' && !target) target=await s.user(key,null,s.store,false);
   assert(target,'NOT_FOUND','举报对象不存在',404);
-  if(type==='goods') assert(target.sellerId===openid || await s.visible(target),'FORBIDDEN','无法访问举报对象',403);
+  if (type === 'goods') {
+    const state = await s.listingState(target);
+    assert(state !== 'deleted' && (state !== 'draft' || target.sellerId === openid),'FORBIDDEN','无法访问举报对象',403);
+  }
   if(type==='offers') assert([target.buyerId,target.sellerId].includes(openid),'FORBIDDEN','无权访问该报价',403);
   if(type==='messages') {
     const c=await s.store.get('conversations',target.conversationId);
@@ -21,6 +26,23 @@ async function targetForReport(s,type,key,openid) {
 }
 async function miniGovernance(s,name,p,openid) {
   const u=await s.user(openid,null,s.store,false);
+  assert(u.accountStatus !== 'deleted','ACCOUNT_DELETED','账号已注销',403);
+  if (p.action === 'closeAccount') {
+    assert(p.confirm === true && p.confirmation === '注销账号','CONFIRM_REQUIRED','请再次确认注销');
+    return s.store.transaction(async tx => {
+      const current = await s.user(openid,null,tx,false);
+      if (current.accountStatus === 'deleted') return {deleted:true};
+      const actionId = id();
+      await tx.put('users',current._id,{
+        _openid:openid, accountStatus:'deleted', accessEpoch:actionId, deletedAt:s.now(),
+        contentVersion:id(), profileComplete:false, nickName:'', avatarUrl:'', contact:''
+      });
+      await s.enqueue(tx,'user-ban',actionId,{openid,previousEpoch:trade.epoch(current),deleted:true});
+      await s.audit(tx,{_id:current._id,role:'user'},'governance.closeAccount',current._id,
+        {accountStatus:current.accountStatus || 'normal'},{accountStatus:'deleted'},'本人确认注销');
+      return {deleted:true};
+    });
+  }
   if(p.action==='uploadTicket') return mediaTicket(s,openid);
   if(p.action==='registerMedia') return registerMedia(s,openid,p);
   if(p.action==='notifications') return s.store.find('notifications',{ownerId:openid},{sort:'createdAt',limit:100});
@@ -44,9 +66,22 @@ async function miniGovernance(s,name,p,openid) {
   const rules=(await s.setting('rules')).content; await s.rate(openid,'report',rules.reportPerHour,3600000);
   const type=p.targetType || 'goods'; const key=p.targetId || p.goodsId;
   const target=await targetForReport(s,type,key,openid);
-  if(p.action==='appeal') assert(type==='goods' && target.ownerId===openid && target.target.enforcement==='removed','FORBIDDEN','只能申诉本人的违规下架商品',403);
-  const reason=text(p.reason,200,true);const detail=text(p.detail,2000);const reportId=id();
-  await s.store.transaction(tx=>tx.put('reports',reportId,{targetType:type,targetId:target.target._id,ownerId:target.ownerId,reporterId:openid,kind:p.action==='appeal'?'appeal':'report',reason,detail,snapshot:target.snapshot,state:'pending',status:'pending',version:1,createdAt:s.now()}));
+  if (p.action === 'appeal') {
+    const canAppeal = type === 'goods' && (target.target.enforcement === 'removed' || target.target.moderationStatus === 'rejected') ||
+      type === 'users' && ['banned','restricted'].includes(trade.accountState(u,s.now()).accountStatus);
+    assert(canAppeal && target.ownerId === openid,'FORBIDDEN','只能申诉本人的有效处置',403);
+  }
+  const reason=text(p.reason,200,true);const detail=text(p.detail,2000);
+  const actionId = target.target.governanceActionId || target.target.moderationTaskId || 'legacy';
+  const reportId = p.action === 'appeal' ? hash(['appeal',openid,type,target.target._id,actionId].join(':')) : id();
+  await s.store.transaction(async tx => {
+    const caller = await s.user(openid,null,tx,false);
+    assert(caller.accountStatus !== 'deleted','ACCOUNT_DELETED','账号已注销',403);
+    assert(!await tx.get('reports',reportId),'CONFLICT','此处置已提交申诉',409);
+    await tx.put('reports',reportId,{targetType:type,targetId:target.target._id,ownerId:target.ownerId,
+      reporterId:openid,kind:p.action==='appeal'?'appeal':'report',reason,detail,snapshot:target.snapshot,
+      appealActionId:p.action==='appeal'?actionId:'',state:'pending',status:'pending',version:1,createdAt:s.now()});
+  });
   return {_id:reportId};
 }
 
@@ -69,11 +104,11 @@ const entities = {
 };
 function summary(s,entity,doc) {
   if(entity==='admins') return publicAdmin(doc);
-  if(entity==='users') return {_id:doc._id,nickName:doc.nickName,campus:doc.campus,college:doc.college,accountStatus:doc.accountStatus || 'normal',
-    moderationStatus:doc.moderationStatus,restrictedUntil:doc.restrictedUntil,createdAt:doc.createdAt};
+  if(entity==='users') return {_id:doc._id,nickName:doc.nickName,campus:doc.campus,college:doc.college,accountStatus:trade.accountState(doc,s.now()).accountStatus,
+    moderationStatus:doc.moderationStatus, restrictions:doc.restrictions || [], governanceReason:doc.governanceReason || '', restrictedUntil:doc.restrictedUntil,createdAt:doc.createdAt};
   if(entity==='reports') { const {snapshot,detail,reporterId,ownerId,_openid,...rest}=normalizeReport(doc);return rest; }
   if(entity==='moderation') {const {ownerId,...rest}=doc;return rest;}
-  if(entity==='goods') return Object.fromEntries(['_id','title','cat','price','campus','condition','status','moderationStatus','enforcement','createdAt'].map(k=>[k,doc[k]]));
+  if(entity==='goods') return Object.fromEntries(['_id','title','cat','price','campus','condition','status','moderationStatus','enforcement','governanceReason','createdAt'].map(k=>[k,doc[k]]));
   if(entity==='risks') { const {facts,ownerId,...rest}=doc;return rest; }
   if(entity==='tasks') return Object.fromEntries(['_id','kind','state','attempts','lastError','createdAt'].map(k=>[k,doc[k]]));
   return doc;
@@ -148,44 +183,63 @@ async function govern(s,actor,p) {
   return s.store.transaction(async tx=>{
     const obj=await tx.get(p.targetType,p.targetId);assert(obj,'NOT_FOUND','对象不存在',404);
     let next={...obj};
-    if(p.targetType==='goods') {
-      if(p.action==='remove') {
-        assert(obj.enforcement!=='removed','INVALID_STATE','商品已违规下架',409);
-        next.enforcement='removed';
-        next.statusBeforeRemoval=obj.status;
-        if (['on','locked'].includes(obj.status)) next.status='off';
-      }
-      if(p.action==='restore') {
-        assert(obj.enforcement==='removed' && obj.moderationStatus==='approved','INVALID_STATE','先完成内容复核，才可恢复');
-        const owner=await s.user(obj.sellerId,null,tx,false);
-        assert(!['banned','deleted'].includes(owner.accountStatus),'INVALID_STATE','卖家状态不允许恢复');
-        next.enforcement='normal';
-        if(next.status==='locked' || obj.statusBeforeRemoval==='locked') {next.status='off';next.buyerId='';}
-        else if (next.status==='off' && obj.statusBeforeRemoval==='on') next.status='on';
-        delete next.statusBeforeRemoval;
+    if (p.targetType === 'goods') {
+      assert(obj.status !== 'deleted','INVALID_STATE','商品已删除',409);
+      if (p.action === 'remove') {
+        assert(obj.enforcement !== 'removed','INVALID_STATE','商品已违规下架',409);
+        next = await trade.closeTrade(s,tx,obj,['on','locked'].includes(obj.status) ? 'off' : obj.status,'removed',{
+          enforcement:'removed',statusBeforeRemoval:obj.status,governanceReason:reason,governanceActionId:actionId
+        });
+      } else {
+        assert(obj.enforcement === 'removed' && obj.moderationStatus !== 'rejected',
+          'INVALID_STATE','请先撤销违规审核结论，再恢复商品');
+        const owner = await s.user(obj.sellerId,'publish',tx,false);
+        const canReturn = obj.statusBeforeRemoval === 'on' && obj.status === 'off' &&
+          (obj.sellerEpoch || '') === trade.epoch(owner);
+        next = {...obj,enforcement:'normal',status:canReturn?'on':obj.status === 'locked'?'off':obj.status,
+          statusBeforeRemoval:'',governanceReason:'',governanceActionId:actionId};
       }
     } else {
-      assert(obj.accountStatus!=='deleted','INVALID_STATE','已注销账号不能执行该处置',409);
-      if(p.action==='ban') next.accountStatus='banned';
-      if(p.action==='restrict') {
-        assert(Array.isArray(p.restrictions) && p.restrictions.length>0 && p.restrictions.every(x=>['publish','offer','message','upload','profile'].includes(x)),'INVALID_INPUT','请选择限制能力');
-        const hours=Number(p.hours);assert(Number.isFinite(hours)&&hours>=1&&hours<=8760,'INVALID_INPUT','限制期限为1至8760小时');
-        Object.assign(next,{accountStatus:'restricted',restrictions:p.restrictions,restrictedUntil:s.now()+hours*3600000});
+      assert(obj.accountStatus !== 'deleted','INVALID_STATE','已注销账号不能执行该处置',409);
+      const state = trade.accountState(obj,s.now()).accountStatus;
+      if (p.action === 'ban') {
+        assert(state !== 'banned','INVALID_STATE','账号已封禁',409);
+        Object.assign(next,{accountStatus:'banned',accessEpoch:actionId,restrictions:[],restrictedUntil:0,
+          governanceReason:reason,governanceActionId:actionId});
+        delete next.pendingProfile;
       }
-      if(p.action==='unrestrict') Object.assign(next,{accountStatus:'normal',restrictions:[],restrictedUntil:0});
+      if (p.action === 'restrict') {
+        assert(state !== 'banned','INVALID_STATE','请先解除封禁',409);
+        assert(Array.isArray(p.restrictions) && p.restrictions.length > 0 &&
+          p.restrictions.every(x => trade.capabilities.includes(x)), 'INVALID_INPUT','请选择限制能力');
+        const hours = Number(p.hours);
+        assert(Number.isFinite(hours) && hours >= 1 && hours <= 8760,'INVALID_INPUT','限制期限为1至8760小时');
+        Object.assign(next,{accountStatus:'restricted',restrictions:[...new Set(p.restrictions)],restrictedUntil:s.now()+hours*trade.hour,
+          governanceReason:reason,governanceActionId:actionId});
+      }
+      if (p.action === 'unrestrict') {
+        assert(['banned','restricted'].includes(obj.accountStatus),'INVALID_STATE','当前账号没有可解除的处置',409);
+        Object.assign(next,{accountStatus:'normal',restrictions:[],restrictedUntil:0,governanceReason:'',governanceActionId:actionId});
+      }
     }
-    next.updatedAt=s.now();await tx.put(p.targetType,p.targetId,next);
+    next.updatedAt=s.now();
+    await tx.put(p.targetType,p.targetId,next);
     const ownerId=p.targetType==='users'?obj._openid:obj.sellerId;
     await tx.put('governanceActions',actionId,{targetType:p.targetType,targetId:p.targetId,ownerId,action:p.action,reason,adminId:actor._id,createdAt:s.now()});
     const actionName={remove:'违规下架',restore:'恢复商品展示',warn:'警告',restrict:'限制账号能力',ban:'封禁账号',unrestrict:'解除账号限制'}[p.action];
     await s.notify(tx,ownerId,'governance',actionId,'平台处置：'+actionName+'；原因：'+reason);
-    if(p.action==='remove') await s.enqueue(tx,'goods-state',actionId,{goodsId:obj._id,state:'removed'});
-    if(p.action==='ban') await s.enqueue(tx,'user-ban',actionId,{openid:obj._openid});
+    if(p.action==='ban') await s.enqueue(tx,'user-ban',actionId,{openid:obj._openid,previousEpoch:trade.epoch(obj)});
     if(p.caseId) {
       const original=await tx.get('reports',p.caseId);
       assert(original,'NOT_FOUND','举报不存在',404);
       const report=normalizeReport(original);
       assert(report.state!=='resolved','CONFLICT','举报已处理',409);
+      if (report.kind === 'appeal') {
+        assert(p.action === (p.targetType === 'goods' ? 'restore' : 'unrestrict'),
+          'INVALID_STATE','申诉通过时应解除对应处置',409);
+        const currentAction = obj.governanceActionId || obj.moderationTaskId || 'legacy';
+        assert(!report.appealActionId || report.appealActionId === currentAction,'STALE_CONTENT','该申诉对应的处置已变化',409);
+      }
       const reportedOwner=report.ownerId || (report.targetType==='goods' && (await tx.get('goods',report.targetId))?.sellerId);
       assert((report.targetType===p.targetType && report.targetId===p.targetId) || (p.targetType==='users' && reportedOwner===ownerId),'INVALID_INPUT','处置对象与举报不一致');
       await tx.put('reports',report._id,{...report,state:'resolved',status:'resolved',version:(report.version||0)+1,actionId,publicResult:'已核查并采取平台处置措施',decidedBy:actor._id,decidedAt:s.now()});

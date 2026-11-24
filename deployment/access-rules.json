@@ -1,0 +1,10 @@
+{
+  "documentDatabase": {
+    "read": false,
+    "write": false
+  },
+  "cloudStorage": {
+    "read": false,
+    "write": false
+  }
+}

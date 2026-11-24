@@ -20,7 +20,8 @@
     </view>
   </view>
 
-  <view class="empty" wx:if="{{!list.length}}">
+  <view class="empty" wx:if="{{loadError}}"><text class="empty-text">{{loadError}}</text></view>
+  <view class="empty" wx:elif="{{!list.length && !loading}}">
     <view class="empty-emoji">📦</view>
     <view class="empty-text">还没有发布商品</view>
     <view class="empty-sub">去「发布」发第一件</view>

@@ -1,10 +1,11 @@
 const app = getApp();
 const { HOT_COLLEGES } = require('../../utils/colleges');
 const { decorateGoods } = require('../../utils/format');
+const { withPageReload, reloadLatest } = require('../../utils/page-reload');
 
 const ALL_CAMPUS = '全部校区';
 
-Page({
+Page(withPageReload({
   data: {
     campus: ALL_CAMPUS,
     campusOptions: [ALL_CAMPUS].concat(app.globalData.campusList),
@@ -12,7 +13,8 @@ Page({
     categories: [],
     activeTab: 'all',
     goods: [],
-    loading: false
+    loading: false,
+    loadError: ''
   },
 
   onLoad() {
@@ -23,22 +25,29 @@ Page({
     this.setData({ campus, categories });
   },
 
-  onShow() { this.fetch(); },
-
-  fetch() {
-    this.setData({ loading: true });
+  reload() {
     const params = { action: 'search' };
     if (this.data.campus && this.data.campus !== ALL_CAMPUS) params.campus = this.data.campus;
     if (this.data.activeTab === 'book') params.cat = 'book';
-    app.call('goods', params)
-      .then((list) => this.setData({ goods: decorateGoods(list) }))
-      // 查询失败时保留已有列表，避免从详情返回后整页空白
-      .catch((err) => wx.showToast({ title: (err && (err.friendly || err.message)) || '加载失败', icon: 'none' }))
-      .then(() => this.setData({ loading: false }));
+    const query = JSON.stringify(params);
+    return reloadLatest(this, () => {
+      const patch = { loading: true, loadError: '' };
+      if (query !== this._loadedQuery) patch.goods = [];
+      this.setData(patch);
+      return app.call('goods', params);
+    }, (list) => {
+      const goods = decorateGoods(list);
+      this._loadedQuery = query;
+      this.setData({ goods, loading: false });
+    }, (err) => {
+      this.setData({ loading: false, loadError: '商品加载失败，请稍后重试' });
+      if (err && err.friendly) wx.showToast({ title: err.friendly, icon: 'none' });
+    });
   },
 
   onTab(e) {
-    this.setData({ activeTab: e.currentTarget.dataset.tab }, () => this.fetch());
+    this.setData({ activeTab: e.currentTarget.dataset.tab });
+    return this.reload();
   },
 
   onCategory(e) {
@@ -61,7 +70,7 @@ Page({
         wx.setStorageSync('homeCampus', campus);
         if (campus !== ALL_CAMPUS) app.globalData.campus = campus; // 发布页默认校区跟随
         this.setData({ campus });
-        this.fetch();
+        this.reload();
       }
     });
   },
@@ -70,4 +79,4 @@ Page({
   goMessage() { wx.switchTab({ url: '/pages/message/message' }); },
   goCollege() { wx.navigateTo({ url: '/pages/college/college' }); },
   goDetail(e) { wx.navigateTo({ url: '/pages/detail/detail?id=' + e.currentTarget.dataset.id }); }
-});
+}));

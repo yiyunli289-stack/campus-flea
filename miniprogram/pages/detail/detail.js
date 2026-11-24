@@ -1,7 +1,8 @@
 const app = getApp();
 const { decorateGoods, fmtTime } = require('../../utils/format');
+const { withPageReload, reloadLatest } = require('../../utils/page-reload');
 
-Page({
+Page(withPageReload({
   data: {
     goods: null,
     isBook: false,
@@ -10,11 +11,10 @@ Page({
   },
 
   onLoad(query) { this.id = query.id; },
-  onShow() { this.fetch(); },
-
-  fetch() {
-    app.call('goods', { action: 'detail', id: this.id })
-      .then((g) => {
+  reload() {
+    return reloadLatest(this,
+      () => app.call('goods', { action: 'detail', id: this.id }),
+      (g) => {
         const goods = decorateGoods([g])[0];
         const NOTE_CLASS = { '无笔记': 'note-none', '少量': 'note-few', '较多': 'note-many', '大量': 'note-lots' };
         goods.noteClass = NOTE_CLASS[goods.noteLevel] || 'note-none';
@@ -25,8 +25,9 @@ Page({
           isMine: !!(me && goods.sellerId === me._openid),
           timeText: fmtTime(goods.createdAt)
         });
-      })
-      .catch((err) => wx.showToast({ title: err.message || '加载失败', icon: 'none' }));
+      },
+      (err) => wx.showToast({ title: err.message || '加载失败', icon: 'none' })
+    );
   },
 
   onBuy() { this.makeOffer(this.data.goods.price); },
@@ -102,4 +103,4 @@ Page({
       }
     });
   }
-});
+}));

@@ -14,7 +14,8 @@ Page({
     contact: ''
   },
 
-  onLoad() {
+  onShow() {
+    if (this._editing) return;
     const user = app.globalData.userInfo || {};
     const campusList = app.globalData.campusList;
     const campusIndex = Math.max(0, campusList.indexOf(user.campus));
@@ -32,17 +33,19 @@ Page({
   },
 
   onChooseAvatar(e) {
+    this._editing = true;
     this.setData({ avatarUrl: e.detail.avatarUrl });
   },
 
-  onNickName(e) { this.setData({ nickName: e.detail.value }); },
-  onCampus(e) { this.setData({ campusIndex: Number(e.detail.value) }); },
+  onNickName(e) { this._editing = true; this.setData({ nickName: e.detail.value }); },
+  onCampus(e) { this._editing = true; this.setData({ campusIndex: Number(e.detail.value) }); },
   onCollege(e) {
+    this._editing = true;
     const i = Number(e.detail.value);
     this.setData({ collegeIndex: i, college: ALL_COLLEGES[i] });
   },
-  onMajor(e) { this.setData({ major: e.detail.value }); },
-  onContact(e) { this.setData({ contact: e.detail.value }); },
+  onMajor(e) { this._editing = true; this.setData({ major: e.detail.value }); },
+  onContact(e) { this._editing = true; this.setData({ contact: e.detail.value }); },
 
   onSave() {
     const { nickName, avatarUrl, campusList, campusIndex, college, major, contact } = this.data;

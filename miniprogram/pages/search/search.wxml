@@ -35,7 +35,9 @@
     <view class="f-reset" bindtap="reset">重置</view>
   </view>
 
-  <view class="result-count" wx:if="{{searched}}">共 {{list.length}} 件</view>
+  <view class="result-count" wx:if="{{loading}}">正在加载商品…</view>
+  <view class="result-count" wx:elif="{{loadError}}">{{loadError}}</view>
+  <view class="result-count" wx:elif="{{searched}}">共 {{list.length}} 件</view>
 
   <!-- 结果 -->
   <view class="goods">
@@ -56,7 +58,7 @@
     </view>
   </view>
 
-  <view class="empty" wx:if="{{searched && !list.length && !loading}}">
+  <view class="empty" wx:if="{{searched && !list.length && !loading && !loadError}}">
     <view class="empty-emoji">🔍</view>
     <view class="empty-text">没有找到相关商品</view>
   </view>

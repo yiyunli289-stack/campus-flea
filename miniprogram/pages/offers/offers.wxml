@@ -40,7 +40,8 @@
     </view>
   </block>
 
-  <view class="empty" wx:if="{{!received.length && !sent.length}}">
+  <view class="empty" wx:if="{{loadError}}"><text class="empty-text">{{loadError}}</text></view>
+  <view class="empty" wx:elif="{{!loading && (tab === 'received' ? !received.length : !sent.length)}}">
     <view class="empty-emoji">💰</view>
     <view class="empty-text">暂无报价</view>
   </view>

@@ -22,7 +22,8 @@
       <view class="c-badge" wx:if="{{item.unread}}">{{item.unread}}</view>
     </view>
 
-    <view class="empty" wx:if="{{!list.length}}">
+    <view class="empty" wx:if="{{loadError}}"><text class="empty-text">{{loadError}}</text></view>
+    <view class="empty" wx:elif="{{!list.length && !loading}}">
       <view class="empty-emoji">🕊️</view>
       <view class="empty-text">还没有会话，去商品详情页「聊一聊」吧</view>
     </view>
